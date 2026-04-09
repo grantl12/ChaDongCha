@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 from db import get_client
 
@@ -48,4 +48,26 @@ async def signin(body: SignInRequest):
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token,
         "user_id": result.user.id,
+    }
+
+
+@router.get("/me")
+async def me_info(authorization: str = Header(...)):
+    db = get_client()
+    token = authorization.replace("Bearer ", "")
+    try:
+        user = db.auth.get_user(token)
+        user_id = user.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = db.table("players").select("username, xp, level").eq("id", user_id).single().execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    return {
+        "user_id": user_id,
+        "username": result.data["username"],
+        "xp": result.data["xp"],
+        "level": result.data["level"],
     }

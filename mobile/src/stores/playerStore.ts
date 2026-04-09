@@ -9,6 +9,7 @@ type PlayerStore = {
   level: number;
   accessToken: string | null;
   setPlayer: (data: { userId: string; username: string; accessToken: string }) => void;
+  setProfile: (xp: number, level: number) => void;
   applyXp: (delta: number, newLevel?: number) => void;
   clearSession: () => void;
 };
@@ -24,6 +25,10 @@ export const usePlayerStore = create<PlayerStore>()(
 
       setPlayer({ userId, username, accessToken }) {
         set({ userId, username, accessToken });
+      },
+
+      setProfile(xp, level) {
+        set({ xp, level });
       },
 
       applyXp(delta, newLevel) {

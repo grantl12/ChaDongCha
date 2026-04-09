@@ -1,6 +1,10 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
+import { usePlayerStore } from '@/stores/playerStore';
 
 export default function TabsLayout() {
+  const accessToken = usePlayerStore(s => s.accessToken);
+  if (!accessToken) return <Redirect href="/onboarding" />;
+
   return (
     <Tabs
       screenOptions={{

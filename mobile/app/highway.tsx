@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, AppState } from 'react-native';
+import { View, Text, StyleSheet, AppState, NativeModules } from 'react-native';
 import { Camera, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
 import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -11,9 +11,11 @@ import {
   VehicleClassifierStub,
 } from '@/modules/vehicle-classifier';
 
-// Swap to stub for dev builds without native modules:
-// const Classifier = VehicleClassifierStub;
-const Classifier = VehicleClassifier;
+// Auto-detect native module — falls back to stub when native impl is not yet built.
+// Once the CoreML/TFLite integration is wired in Phase 3, this will switch automatically.
+const Classifier = NativeModules.VehicleClassifierModule
+  ? VehicleClassifier
+  : VehicleClassifierStub;
 
 const SPEED_THRESHOLD_MPH  = 15;
 const TRIGGER_FPS           = 2;    // Stage 1: MobileNet SSD poll rate
