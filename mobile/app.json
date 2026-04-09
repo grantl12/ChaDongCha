@@ -51,6 +51,11 @@
     "scheme": "chadongcha",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d3e6b66e-6a68-40f4-ad6f-436a459c6dc8"
+      }
     }
   }
 }
