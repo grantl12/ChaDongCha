@@ -8,9 +8,17 @@ from services.xp_service import compute_xp, apply_xp
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
 
-# How long the same physical vehicle (by plate hash) is protected from re-catch XP.
-# Player can still catch it (record is stored) but no XP is awarded.
-DEDUP_WINDOW_HOURS = 4
+# --- Dedup configuration ---
+# Tier 1 (hash-based): plate hash is only trusted when ALPR plate read confidence
+# is high enough. Below this, the hash is too unreliable to use for dedup.
+HASH_DEDUP_MIN_PLATE_CONFIDENCE = 0.85
+HASH_DEDUP_WINDOW_HOURS         = 4
+
+# Tier 2 (fuzzy): same generation + same district + short window.
+# Catches parking-lot farming even without a reliable plate read.
+# Intentionally short — a tight window avoids false positives on busy roads
+# where many cars of the same model pass through the same district.
+FUZZY_DEDUP_WINDOW_MINUTES      = 20
 
 router = APIRouter()
 
@@ -27,10 +35,13 @@ class CatchPayload(BaseModel):
     road_segment_id: Optional[str] = None
     space_object_id: Optional[str] = None
     caught_at: datetime
-    # ALPR output — confidence boost + dedup hash. Plate NEVER in payload.
+    # ALPR output — confidence boost + dedup signals. Plate NEVER in payload.
     alpr_confidence_boost: Optional[float] = None
-    # SHA-256 hash of plate, computed on-device inside alpr-wrapper before plate is zeroed.
-    # null when plate was unreadable — dedup check is skipped for that catch.
+    # ALPR's confidence in its own plate character read (0.0–1.0).
+    # Used to decide whether vehicle_hash is reliable enough for hash-based dedup.
+    alpr_plate_confidence: Optional[float] = None
+    # SHA-256 hash of plate, zeroed on-device immediately after hashing.
+    # Only trusted for dedup when alpr_plate_confidence >= 0.85.
     vehicle_hash: Optional[str] = None
 
 
@@ -46,8 +57,15 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Dedup check — same physical vehicle (by plate hash) within the window
-    is_duplicate = _is_duplicate_vehicle(db, player_id, body.vehicle_hash)
+    # Two-tier dedup check
+    dedup_result = _check_dedup(
+        db, player_id,
+        vehicle_hash=body.vehicle_hash,
+        plate_confidence=body.alpr_plate_confidence,
+        generation_id=body.generation_id,
+        fuzzy_district=body.fuzzy_district,
+    )
+    is_duplicate = dedup_result is not None
 
     # Insert catch row
     catch_row = {
@@ -64,7 +82,11 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "space_object_id": body.space_object_id,
         "caught_at": body.caught_at.isoformat(),
         "synced_at": datetime.utcnow().isoformat(),
-        "vehicle_hash": body.vehicle_hash,
+        # Only persist the hash when plate confidence was high enough to trust it.
+        # Low-confidence hashes aren't reliable and shouldn't poison future dedup checks.
+        "vehicle_hash": body.vehicle_hash
+            if (body.alpr_plate_confidence or 0) >= HASH_DEDUP_MIN_PLATE_CONFIDENCE
+            else None,
     }
     result = db.table("catches").insert(catch_row).execute()
     catch_id = result.data[0]["id"]
@@ -80,6 +102,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
             "road_king_claimed": False,
             "first_finder_awarded": None,
             "duplicate": True,
+            "duplicate_reason": dedup_result,   # "hash" | "fuzzy"
         }
 
     # XP computation
@@ -115,21 +138,54 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     }
 
 
-def _is_duplicate_vehicle(db, player_id: str, vehicle_hash: Optional[str]) -> bool:
+def _check_dedup(
+    db,
+    player_id: str,
+    vehicle_hash: Optional[str],
+    plate_confidence: Optional[float],
+    generation_id: Optional[str],
+    fuzzy_district: Optional[str],
+) -> Optional[str]:
     """
-    Returns True if this player already caught a vehicle with the same plate hash
-    within DEDUP_WINDOW_HOURS. Skipped entirely when vehicle_hash is None (plate
-    was unreadable — we give the player the benefit of the doubt).
+    Two-tier dedup. Returns the tier that fired ("hash" | "fuzzy"), or None.
+
+    Tier 1 — Hash (exact plate identity):
+      Requires plate_confidence >= 0.85 to be trustworthy. A lower-confidence
+      read may have misread characters, producing a hash that doesn't match the
+      same plate on the next pass. Window: 4 hours.
+
+    Tier 2 — Fuzzy (generation + district + time):
+      Catches the parking-lot farming case even without a readable plate.
+      Same player + same generation + same district within 20 minutes = same car.
+      Window intentionally short to avoid false positives on busy roads where
+      many cars of the same model legitimately pass through the same district.
     """
-    if not vehicle_hash:
-        return False
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=DEDUP_WINDOW_HOURS)).isoformat()
-    result = db.table("catches").select("id", count="exact") \
-        .eq("player_id", player_id) \
-        .eq("vehicle_hash", vehicle_hash) \
-        .gte("caught_at", cutoff) \
-        .execute()
-    return (result.count or 0) > 0
+    now = datetime.now(timezone.utc)
+
+    # Tier 1: hash-based — only when plate read confidence is high enough
+    if vehicle_hash and (plate_confidence or 0) >= HASH_DEDUP_MIN_PLATE_CONFIDENCE:
+        cutoff = (now - timedelta(hours=HASH_DEDUP_WINDOW_HOURS)).isoformat()
+        result = db.table("catches").select("id", count="exact") \
+            .eq("player_id", player_id) \
+            .eq("vehicle_hash", vehicle_hash) \
+            .gte("caught_at", cutoff) \
+            .execute()
+        if (result.count or 0) > 0:
+            return "hash"
+
+    # Tier 2: fuzzy — generation + district + tight time window
+    if generation_id and fuzzy_district:
+        cutoff = (now - timedelta(minutes=FUZZY_DEDUP_WINDOW_MINUTES)).isoformat()
+        result = db.table("catches").select("id", count="exact") \
+            .eq("player_id", player_id) \
+            .eq("generation_id", generation_id) \
+            .eq("fuzzy_district", fuzzy_district) \
+            .gte("caught_at", cutoff) \
+            .execute()
+        if (result.count or 0) > 0:
+            return "fuzzy"
+
+    return None
 
 
 def _get_player_xp(db, player_id: str) -> int:

@@ -31,16 +31,28 @@ export type ALPRResult = {
    */
   confidenceBoost: number;
   /**
+   * The ALPR model's own confidence in how accurately it read the plate
+   * characters (0.0–1.0). This is independent of the vehicle classification
+   * confidence — it measures OCR quality, not vehicle ID quality.
+   *
+   * Used by the backend to decide whether to trust the vehicleHash for
+   * deduplication. Low confidence reads produce unreliable hashes (a smudged
+   * plate might read differently each time), so the backend only uses the
+   * hash for dedup when this value exceeds a threshold (≥ 0.85).
+   *
+   * 0.0 when plate was unreadable.
+   */
+  plateConfidence: number;
+  /**
    * One-way SHA-256 hash of the plate string, computed inside the native
    * module before the plate string is zeroed. Used ONLY for same-vehicle
-   * deduplication on the backend — prevents farming XP from the same
-   * physical car repeatedly.
+   * deduplication on the backend.
    *
-   * The backend checks: has this player caught a vehicle with this hash
-   * within the dedup window? If yes, catch is recorded but no XP awarded.
+   * Only trusted for dedup when plateConfidence >= 0.85. Below that,
+   * the backend falls back to fuzzy dedup (generation + location + time).
    *
    * Plate string is NEVER recoverable from this hash. null if plate
-   * was unreadable (dedup check skipped for that catch).
+   * was unreadable.
    */
   vehicleHash: string | null;
 };
@@ -68,7 +80,6 @@ export const ALPRWrapper: IALPRWrapper = ALPRWrapperModule;
 
 export const ALPRWrapperStub: IALPRWrapper = {
   process(_frame, _bbox): ALPRResult {
-    // Stub: no plate reading, no confidence boost, no dedup hash
-    return { confidenceBoost: 0, vehicleHash: null };
+    return { confidenceBoost: 0, plateConfidence: 0, vehicleHash: null };
   },
 };
