@@ -1,4 +1,3 @@
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,12 +6,15 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",          # don't error on unknown env vars
+        extra="ignore",
+        protected_namespaces=(),   # suppresses model_ namespace warning
     )
 
     supabase_url: str
     supabase_service_key: str
-    allowed_origins: list[str] = ["http://localhost:8081"]
+    # Plain string — split on comma where needed (avoids pydantic-settings
+    # trying to JSON-decode a list field from an env var string)
+    allowed_origins: str = "http://localhost:8081"
     redis_url: str = "redis://localhost:6379"
     r2_account_id: str = ""
     r2_access_key_id: str = ""
@@ -23,12 +25,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     model_current_version: str = "0.0.1"
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_origins(cls, v: object) -> list[str]:
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return list(v)  # type: ignore[arg-type]
+    def origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
 settings = Settings()
