@@ -1,149 +1,238 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import Mapbox, { Camera, LocationPuck, MapView, ShapeSource, LineLayer, SymbolLayer } from '@rnmapbox/maps';
+import Constants from 'expo-constants';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
+import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
 
-type LeaderboardPlayer = {
+// Set token once at module level — safe to call multiple times
+const token: string = Constants.expoConfig?.extra?.mapboxPublicToken ?? '';
+Mapbox.setAccessToken(token);
+
+// Dark road-ownership style
+const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11';
+
+type RoadSegment = {
   id: string;
-  username: string;
-  xp: number;
-  level: number;
+  name: string | null;
+  city: string | null;
+  king_id: string | null;
+  king_scan_count: number;
+  king_since: string | null;
+  players: { username: string } | null;
+  geometry?: GeoJSON.LineString;
 };
 
-const LEVEL_TITLE: [number, string][] = [
-  [51, 'Legend of the Road'],
-  [36, 'Apex Collector'],
-  [21, 'Road King'],
-  [11, 'Highway Hunter'],
-  [6,  'Lane Changer'],
-  [1,  'Street Spotter'],
-];
+type BottomSheetData = {
+  segment: RoadSegment;
+  challengers: { players: { username: string }; scan_count_30d: number }[];
+} | null;
 
-function levelTitle(level: number): string {
-  for (const [min, title] of LEVEL_TITLE) {
-    if (level >= min) return title;
+export default function MapScreen() {
+  const { latitude, longitude } = useLocation();
+  const userId = usePlayerStore(s => s.userId);
+  const [selected, setSelected] = useState<BottomSheetData>(null);
+  const camera = useRef<Camera>(null);
+
+  // Nearby road segments around player's position
+  // Road segments are populated via the territory worker (Phase 7 backend).
+  // Until OSM data is seeded, this returns an empty list gracefully.
+  const { data: segments = [], isLoading } = useQuery<RoadSegment[]>({
+    queryKey: ['road-segments', latitude?.toFixed(2), longitude?.toFixed(2)],
+    queryFn: () =>
+      apiClient.get(
+        `/territory/nearby?lat=${latitude}&lon=${longitude}&radius_km=5`,
+      ) as Promise<RoadSegment[]>,
+    enabled: !!(latitude && longitude),
+    staleTime: 60_000,
+  });
+
+  // Centre map on player when location first resolves
+  useEffect(() => {
+    if (latitude && longitude) {
+      camera.current?.setCamera({
+        centerCoordinate: [longitude, latitude],
+        zoomLevel: 14,
+        animationDuration: 800,
+      });
+    }
+  }, [!!latitude]);  // fire once when location becomes available
+
+  async function handleSegmentPress(segmentId: string) {
+    try {
+      const res = await apiClient.get(`/leaderboard/road/${segmentId}`) as BottomSheetData;
+      setSelected(res);
+    } catch {
+      setSelected(null);
+    }
   }
-  return 'Street Spotter';
-}
 
-function PlayerRow({ item, rank, myId }: { item: LeaderboardPlayer; rank: number; myId: string | null }) {
-  const isMe = item.id === myId;
-  return (
-    <View style={[styles.row, isMe && styles.rowMe]}>
-      <Text style={[styles.rank, rank <= 3 && styles.rankTop]}>{rank}</Text>
-      <View style={styles.rowBody}>
-        <Text style={[styles.username, isMe && styles.usernameMe]}>{item.username}{isMe ? '  ←' : ''}</Text>
-        <Text style={styles.titleText}>{levelTitle(item.level)}</Text>
-      </View>
-      <View style={styles.rowRight}>
-        <Text style={styles.xp}>{item.xp.toLocaleString()}</Text>
-        <Text style={styles.xpLabel}>XP</Text>
-      </View>
-    </View>
-  );
-}
-
-type Tab = 'global' | 'city';
-
-export default function LeaderboardScreen() {
-  const [tab, setTab] = useState<Tab>('global');
-  const userId   = usePlayerStore(s => s.userId);
-  const username = usePlayerStore(s => s.username);
-
-  const globalQ = useQuery({
-    queryKey: ['leaderboard', 'global'],
-    queryFn:  () => apiClient.get('/leaderboard/global') as Promise<LeaderboardPlayer[]>,
-    staleTime: 60_000,
-  });
-
-  // City leaderboard — we don't store home_city on the player client-side yet,
-  // so we use username as a stand-in city label. This is a placeholder until
-  // the home city onboarding step is wired up.
-  const cityQ = useQuery({
-    queryKey: ['leaderboard', 'city', 'seoul'],
-    queryFn:  () => apiClient.get('/leaderboard/city/seoul') as Promise<LeaderboardPlayer[]>,
-    staleTime: 60_000,
-    enabled: tab === 'city',
-  });
-
-  const activeQ  = tab === 'global' ? globalQ : cityQ;
-  const data     = activeQ.data ?? [];
+  // Build GeoJSON for owned road segments (those with a king)
+  const ownedFeatures: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: segments
+      .filter(s => s.king_id && s.geometry)
+      .map(s => ({
+        type: 'Feature' as const,
+        id: s.id,
+        geometry: s.geometry!,
+        properties: {
+          isMe: s.king_id === userId,
+          kingName: s.players?.username ?? '—',
+        },
+      })),
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>RANKS</Text>
-        <View style={styles.tabs}>
-          <Pressable
-            style={[styles.tabButton, tab === 'global' && styles.tabActive]}
-            onPress={() => setTab('global')}
-          >
-            <Text style={[styles.tabText, tab === 'global' && styles.tabTextActive]}>GLOBAL</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tabButton, tab === 'city' && styles.tabActive]}
-            onPress={() => setTab('city')}
-          >
-            <Text style={[styles.tabText, tab === 'city' && styles.tabTextActive]}>CITY</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {activeQ.isLoading ? (
-        <View style={styles.center}><ActivityIndicator color="#e63946" /></View>
-      ) : activeQ.isError ? (
+      {!token ? (
         <View style={styles.center}>
-          <Text style={styles.errorText}>Could not load leaderboard.</Text>
-          <Pressable onPress={() => activeQ.refetch()} style={styles.retryButton}>
-            <Text style={styles.retryText}>RETRY</Text>
-          </Pressable>
-        </View>
-      ) : data.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No players yet. Hit the road.</Text>
+          <Text style={styles.errorText}>Mapbox token not configured.</Text>
         </View>
       ) : (
-        <FlatList
-          data={data}
-          keyExtractor={item => item.id}
-          renderItem={({ item, index }) => (
-            <PlayerRow item={item} rank={index + 1} myId={userId} />
+        <MapView
+          style={styles.map}
+          styleURL={MAP_STYLE}
+          logoEnabled={false}
+          attributionEnabled={false}
+          scaleBarEnabled={false}
+        >
+          <Camera ref={camera} zoomLevel={13} />
+
+          {/* Player location puck */}
+          <LocationPuck
+            puckBearingEnabled
+            puckBearing="heading"
+            pulsing={{ isEnabled: true, color: '#e63946' }}
+          />
+
+          {/* Owned road segments — glowing lines */}
+          {ownedFeatures.features.length > 0 && (
+            <ShapeSource
+              id="owned-roads"
+              shape={ownedFeatures}
+              onPress={e => {
+                const id = e.features?.[0]?.id as string | undefined;
+                if (id) handleSegmentPress(id);
+              }}
+            >
+              {/* Glow layer underneath */}
+              <LineLayer
+                id="road-glow"
+                style={{
+                  lineColor: ['case', ['get', 'isMe'], '#e63946', '#4a9eff'],
+                  lineWidth: 8,
+                  lineOpacity: 0.15,
+                  lineBlur: 4,
+                }}
+              />
+              {/* Main road line */}
+              <LineLayer
+                id="road-line"
+                style={{
+                  lineColor: ['case', ['get', 'isMe'], '#e63946', '#4a9eff'],
+                  lineWidth: 2.5,
+                  lineOpacity: 0.9,
+                }}
+              />
+            </ShapeSource>
           )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          onRefresh={activeQ.refetch}
-          refreshing={activeQ.isLoading}
-        />
+        </MapView>
+      )}
+
+      {/* Loading indicator */}
+      {isLoading && (
+        <View style={styles.loadingBadge}>
+          <ActivityIndicator size="small" color="#e63946" />
+        </View>
+      )}
+
+      {/* Empty state overlay — road data not seeded yet */}
+      {!isLoading && segments.length === 0 && latitude && (
+        <View style={styles.emptyOverlay} pointerEvents="none">
+          <Text style={styles.emptyTitle}>ROADS</Text>
+          <Text style={styles.emptyText}>No road data in this area yet.</Text>
+          <Text style={styles.emptyHint}>Road Kings appear as you catch vehicles.</Text>
+        </View>
+      )}
+
+      {/* No location state */}
+      {!latitude && (
+        <View style={styles.emptyOverlay} pointerEvents="none">
+          <Text style={styles.emptyTitle}>ROADS</Text>
+          <Text style={styles.emptyText}>Enable location to view your territory.</Text>
+        </View>
+      )}
+
+      {/* Road segment bottom sheet */}
+      {selected?.segment && (
+        <View style={styles.sheet}>
+          <Pressable style={styles.sheetClose} onPress={() => setSelected(null)}>
+            <Text style={styles.sheetCloseText}>✕</Text>
+          </Pressable>
+
+          <Text style={styles.sheetRoad}>{selected.segment.name ?? 'Unnamed Road'}</Text>
+          <Text style={styles.sheetCity}>{selected.segment.city ?? '—'}</Text>
+
+          <View style={styles.sheetKingRow}>
+            <Text style={styles.sheetKingLabel}>ROAD KING</Text>
+            <Text style={styles.sheetKingName}>
+              {selected.segment.players?.username ?? 'Unclaimed'}
+            </Text>
+            {selected.segment.king_id === userId && (
+              <Text style={styles.sheetYouBadge}>YOU</Text>
+            )}
+          </View>
+
+          {selected.segment.king_id && (
+            <Text style={styles.sheetScans}>
+              {selected.segment.king_scan_count} scans in 30 days
+            </Text>
+          )}
+
+          {selected.challengers?.length > 0 && (
+            <>
+              <Text style={styles.sheetChallengersLabel}>CHALLENGERS</Text>
+              {selected.challengers.slice(0, 3).map((c, i) => (
+                <View key={i} style={styles.challengerRow}>
+                  <Text style={styles.challengerRank}>{i + 1}</Text>
+                  <Text style={styles.challengerName}>{c.players?.username ?? '—'}</Text>
+                  <Text style={styles.challengerScans}>{c.scan_count_30d} scans</Text>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#0a0a0a' },
-  center:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  header:         { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 0, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  title:          { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 3, marginBottom: 16 },
-  tabs:           { flexDirection: 'row', gap: 4, marginBottom: -1 },
-  tabButton:      { paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive:      { borderBottomColor: '#e63946' },
-  tabText:        { color: '#444', fontSize: 12, fontWeight: '700', letterSpacing: 2 },
-  tabTextActive:  { color: '#e63946' },
-  list:           { paddingVertical: 4 },
-  row:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#111' },
-  rowMe:          { backgroundColor: '#e6394608' },
-  rank:           { width: 32, color: '#333', fontSize: 15, fontWeight: '700' },
-  rankTop:        { color: '#e63946' },
-  rowBody:        { flex: 1, gap: 2 },
-  username:       { color: '#fff', fontSize: 15, fontWeight: '700' },
-  usernameMe:     { color: '#e63946' },
-  titleText:      { color: '#444', fontSize: 12 },
-  rowRight:       { alignItems: 'flex-end' },
-  xp:             { color: '#fff', fontSize: 16, fontWeight: '800' },
-  xpLabel:        { color: '#444', fontSize: 11, letterSpacing: 1 },
-  emptyText:      { color: '#444', fontSize: 14 },
-  errorText:      { color: '#555', fontSize: 14 },
-  retryButton:    { borderWidth: 1, borderColor: '#333', borderRadius: 6, paddingHorizontal: 20, paddingVertical: 10 },
-  retryText:      { color: '#888', fontSize: 12, letterSpacing: 2, fontWeight: '700' },
+  container:             { flex: 1, backgroundColor: '#0a0a0a' },
+  map:                   { flex: 1 },
+  center:                { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  errorText:             { color: '#555', fontSize: 14 },
+  loadingBadge:          { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: '#0a0a0acc', borderRadius: 20, padding: 10 },
+  emptyOverlay:          { position: 'absolute', bottom: 120, left: 24, right: 24, backgroundColor: '#0a0a0acc', borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
+  emptyTitle:            { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 3 },
+  emptyText:             { color: '#555', fontSize: 13 },
+  emptyHint:             { color: '#333', fontSize: 12 },
+  sheet:                 { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0f0f0f', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, gap: 6, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
+  sheetClose:            { position: 'absolute', top: 16, right: 20 },
+  sheetCloseText:        { color: '#444', fontSize: 18 },
+  sheetRoad:             { color: '#fff', fontSize: 20, fontWeight: '800' },
+  sheetCity:             { color: '#555', fontSize: 13, marginBottom: 8 },
+  sheetKingRow:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sheetKingLabel:        { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sheetKingName:         { color: '#e63946', fontSize: 15, fontWeight: '700' },
+  sheetYouBadge:         { backgroundColor: '#e6394622', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  sheetScans:            { color: '#444', fontSize: 12 },
+  sheetChallengersLabel: { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginTop: 8 },
+  challengerRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  challengerRank:        { color: '#333', fontSize: 13, fontWeight: '700', width: 20 },
+  challengerName:        { color: '#888', fontSize: 13, flex: 1 },
+  challengerScans:       { color: '#444', fontSize: 12 },
 });
