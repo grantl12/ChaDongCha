@@ -16,7 +16,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index"      options={{ title: 'Radar' }} />
       <Tabs.Screen name="garage"     options={{ title: 'Garage' }} />
-      <Tabs.Screen name="map"        options={{ title: 'Roads' }} />
+      <Tabs.Screen name="map"        options={{ title: 'Ranks' }} />
       <Tabs.Screen name="feed"       options={{ title: 'Feed' }} />
       <Tabs.Screen name="profile"    options={{ title: 'Profile' }} />
     </Tabs>

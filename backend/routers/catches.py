@@ -28,6 +28,23 @@ SESSION_WINDOW_HOURS            = 24
 router = APIRouter()
 
 
+@router.get("/recent")
+async def recent_catches(limit: int = 50):
+    """Global activity feed — most recent catches from all players with vehicle + player info."""
+    db = get_client()
+    result = db.table("catches") \
+        .select(
+            "id, caught_at, catch_type, confidence, color, body_style, "
+            "players(username), "
+            "generations(common_name, rarity_tier, models(name, makes(name)))"
+        ) \
+        .not_.is_("generation_id", "null") \
+        .order("caught_at", desc=True) \
+        .limit(min(limit, 100)) \
+        .execute()
+    return result.data
+
+
 class CatchPayload(BaseModel):
     generation_id: Optional[str] = None       # null = unknown vehicle
     variant_id: Optional[str] = None

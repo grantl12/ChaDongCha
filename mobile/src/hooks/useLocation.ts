@@ -5,10 +5,12 @@ type LocationState = {
   speedMph: number;
   fuzzyCity: string | null;
   permitted: boolean;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export function useLocation(): LocationState {
-  const [state, setState] = useState<LocationState>({ speedMph: 0, fuzzyCity: null, permitted: false });
+  const [state, setState] = useState<LocationState>({ speedMph: 0, fuzzyCity: null, permitted: false, latitude: null, longitude: null });
 
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
@@ -24,7 +26,12 @@ export function useLocation(): LocationState {
         loc => {
           const mps = loc.coords.speed ?? 0;
           const mph = mps * 2.237;
-          setState(s => ({ ...s, speedMph: Math.max(0, mph) }));
+          setState(s => ({
+            ...s,
+            speedMph:  Math.max(0, mph),
+            latitude:  loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          }));
         }
       );
     })();
