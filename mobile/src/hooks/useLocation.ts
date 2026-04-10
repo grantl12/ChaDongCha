@@ -23,7 +23,7 @@ export function useLocation(): LocationState {
 
       sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
-        loc => {
+        async loc => {
           const mps = loc.coords.speed ?? 0;
           const mph = mps * 2.237;
           setState(s => ({
@@ -32,6 +32,22 @@ export function useLocation(): LocationState {
             latitude:  loc.coords.latitude,
             longitude: loc.coords.longitude,
           }));
+
+          // Reverse geocode city — throttled: only update when we don't have one yet
+          // or every ~5 minutes. City doesn't change often during a drive.
+          setState(s => {
+            if (s.fuzzyCity) return s;   // already have a city, skip
+            return s;                    // will be set below once geocode resolves
+          });
+          try {
+            const [place] = await Location.reverseGeocodeAsync(
+              { latitude: loc.coords.latitude, longitude: loc.coords.longitude },
+            );
+            const city = place?.city ?? place?.subregion ?? place?.region ?? null;
+            if (city) setState(s => ({ ...s, fuzzyCity: city }));
+          } catch {
+            // Geocode failed — fuzzyCity stays null, non-fatal
+          }
         }
       );
     })();

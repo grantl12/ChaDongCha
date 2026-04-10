@@ -26,7 +26,26 @@ async def get_generation(generation_id: str):
     db = get_client()
     result = db.table("generations").select("*, models(*, makes(*)), variants(*)") \
         .eq("id", generation_id).maybe_single().execute()
-    return result.data if result else None
+    if not result or not result.data:
+        return None
+
+    data = result.data
+
+    # Attach first finder credits
+    ff = db.table("first_finders") \
+        .select("region_scope, region_value, badge_name, awarded_at, players(username)") \
+        .eq("generation_id", generation_id) \
+        .order("awarded_at") \
+        .execute()
+    data["first_finders"] = ff.data if ff else []
+
+    # Global catch count for this generation
+    from postgrest.types import CountMethod
+    count_res = db.table("catches").select("id", count=CountMethod.exact) \
+        .eq("generation_id", generation_id).execute()
+    data["global_catch_count"] = count_res.count or 0
+
+    return data
 
 
 @router.get("/search")

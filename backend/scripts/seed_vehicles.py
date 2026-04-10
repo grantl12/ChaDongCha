@@ -479,6 +479,667 @@ SEED: list[dict] = [
             ]},
         ],
     },
+    # ------------------------------------------------------------------ Acura
+    {
+        "make": "Acura", "country": "JP",
+        "models": [
+            {"name": "MDX", "class": "suv", "generations": [
+                (4, "4th Gen (2022–present)", 2022, None, "uncommon",  50000),
+                (3, "3rd Gen (2014–2020)",    2014, 2020, "uncommon",  55000),
+            ]},
+            {"name": "RDX", "class": "suv", "generations": [
+                (3, "3rd Gen (2019–present)", 2019, None, "uncommon",  70000),
+            ]},
+            {"name": "TLX", "class": "car", "generations": [
+                (3, "3rd Gen (2021–present)", 2021, None, "uncommon",  25000),
+            ]},
+            {"name": "Integra", "class": "car", "generations": [
+                (5, "5th Gen (2023–present)", 2023, None, "rare",  12000),
+            ]},
+            {"name": "NSX", "class": "car", "generations": [
+                (2, "NC1 (2016–2022)", 2016, 2022, "legendary",  800),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Infiniti
+    {
+        "make": "Infiniti", "country": "JP",
+        "models": [
+            {"name": "Q50", "class": "car", "generations": [
+                (1, "V37 (2014–present)", 2014, None, "uncommon",  40000),
+            ]},
+            {"name": "Q60", "class": "car", "generations": [
+                (2, "V37 Coupe (2017–present)", 2017, None, "rare",  10000),
+            ]},
+            {"name": "QX60", "class": "suv", "generations": [
+                (2, "L51 (2022–present)", 2022, None, "uncommon",  45000),
+                (1, "L50 (2013–2021)",    2013, 2021, "uncommon",  50000),
+            ]},
+            {"name": "QX80", "class": "suv", "generations": [
+                (2, "Z62 (2011–present)", 2011, None, "uncommon",  20000),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Genesis
+    {
+        "make": "Genesis", "country": "KR",
+        "models": [
+            {"name": "G80", "class": "car", "generations": [
+                (3, "RG3 (2021–present)", 2021, None, "uncommon",  15000),
+                (2, "DH (2017–2020)",     2017, 2020, "uncommon",  12000),
+            ]},
+            {"name": "G70", "class": "car", "generations": [
+                (1, "IK (2019–present)", 2019, None, "rare",  8000),
+            ]},
+            {"name": "GV80", "class": "suv", "generations": [
+                (1, "JX1 (2021–present)", 2021, None, "uncommon",  15000),
+            ]},
+            {"name": "GV70", "class": "suv", "generations": [
+                (1, "JK1 (2022–present)", 2022, None, "uncommon",  20000),
+            ]},
+            {"name": "G90", "class": "car", "generations": [
+                (2, "RS4 (2023–present)", 2023, None, "rare",  3000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------------- Volvo
+    {
+        "make": "Volvo", "country": "SE",
+        "models": [
+            {"name": "XC90", "class": "suv", "generations": [
+                (2, "L Series (2016–present)", 2016, None, "uncommon",  80000),
+            ]},
+            {"name": "XC60", "class": "suv", "generations": [
+                (2, "U Series (2018–present)", 2018, None, "uncommon",  100000),
+            ]},
+            {"name": "XC40", "class": "suv", "generations": [
+                (1, "536 (2018–present)", 2018, None, "uncommon",  60000),
+            ]},
+            {"name": "S60", "class": "car", "generations": [
+                (3, "Z Series (2019–present)", 2019, None, "uncommon",  20000),
+            ]},
+            {"name": "EX90", "class": "suv", "generations": [
+                (1, "596 (2024–present)", 2024, None, "rare",  15000),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Lincoln
+    {
+        "make": "Lincoln", "country": "US",
+        "models": [
+            {"name": "Navigator", "class": "suv", "generations": [
+                (4, "4th Gen (2018–present)", 2018, None, "rare",  15000),
+            ]},
+            {"name": "Aviator", "class": "suv", "generations": [
+                (2, "2nd Gen (2020–present)", 2020, None, "uncommon",  20000),
+            ]},
+            {"name": "Nautilus", "class": "suv", "generations": [
+                (2, "2nd Gen (2024–present)", 2024, None, "uncommon",  25000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------------- Land Rover
+    {
+        "make": "Land Rover", "country": "GB",
+        "models": [
+            {"name": "Defender", "class": "suv", "generations": [
+                (2, "L663 (2020–present)", 2020, None, "rare",  50000),
+            ]},
+            {"name": "Range Rover", "class": "suv", "generations": [
+                (5, "L460 (2022–present)", 2022, None, "epic",  20000),
+                (4, "L405 (2013–2021)",    2013, 2021, "rare",  25000),
+            ]},
+            {"name": "Range Rover Sport", "class": "suv", "generations": [
+                (3, "L461 (2022–present)", 2022, None, "rare",  30000),
+                (2, "L494 (2014–2022)",    2014, 2022, "uncommon", 35000),
+            ]},
+            {"name": "Discovery", "class": "suv", "generations": [
+                (5, "L462 (2017–present)", 2017, None, "uncommon",  20000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------------- Mini
+    {
+        "make": "Mini", "country": "GB",
+        "models": [
+            {"name": "Cooper", "class": "car", "generations": [
+                (3, "F56 (2014–present)", 2014, None, "uncommon",  40000),
+                (2, "R56 (2006–2013)",    2006, 2013, "uncommon",  50000),
+            ]},
+            {"name": "Countryman", "class": "suv", "generations": [
+                (3, "U25 (2024–present)", 2024, None, "uncommon",  30000),
+                (2, "F60 (2017–2024)",    2017, 2024, "uncommon",  45000),
+            ]},
+            {"name": "Cooper S", "class": "car", "generations": [
+                (3, "F56 S (2014–present)", 2014, None, "rare",  15000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------- Alfa Romeo
+    {
+        "make": "Alfa Romeo", "country": "IT",
+        "models": [
+            {"name": "Giulia", "class": "car", "generations": [
+                (1, "952 (2016–present)", 2016, None, "rare",  10000),
+            ]},
+            {"name": "Stelvio", "class": "suv", "generations": [
+                (1, "949 (2017–present)", 2017, None, "uncommon",  20000),
+            ]},
+            {"name": "Giulia Quadrifoglio", "class": "car", "generations": [
+                (1, "952 QV (2016–present)", 2016, None, "epic",  2000),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Maserati
+    {
+        "make": "Maserati", "country": "IT",
+        "models": [
+            {"name": "Ghibli", "class": "car", "generations": [
+                (3, "M157 (2013–2023)", 2013, 2023, "epic",  5000),
+            ]},
+            {"name": "Levante", "class": "suv", "generations": [
+                (1, "M161 (2016–present)", 2016, None, "epic",  6000),
+            ]},
+            {"name": "GranTurismo", "class": "car", "generations": [
+                (2, "M290 (2023–present)", 2023, None, "epic",  2000),
+            ]},
+            {"name": "MC20", "class": "car", "generations": [
+                (1, "F154 (2021–present)", 2021, None, "legendary",  800),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Bentley
+    {
+        "make": "Bentley", "country": "GB",
+        "models": [
+            {"name": "Continental GT", "class": "car", "generations": [
+                (3, "3rd Gen (2018–present)", 2018, None, "legendary",  3000),
+                (2, "2nd Gen (2011–2018)",    2011, 2018, "legendary",  2500),
+            ]},
+            {"name": "Bentayga", "class": "suv", "generations": [
+                (2, "2nd Gen (2021–present)", 2021, None, "legendary",  4000),
+            ]},
+            {"name": "Flying Spur", "class": "car", "generations": [
+                (3, "3rd Gen (2020–present)", 2020, None, "legendary",  2000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------------- Rolls-Royce
+    {
+        "make": "Rolls-Royce", "country": "GB",
+        "models": [
+            {"name": "Ghost", "class": "car", "generations": [
+                (2, "2nd Gen (2021–present)", 2021, None, "legendary",  2000),
+            ]},
+            {"name": "Cullinan", "class": "suv", "generations": [
+                (1, "RR31 (2018–present)", 2018, None, "legendary",  2500),
+            ]},
+            {"name": "Spectre", "class": "car", "generations": [
+                (1, "RR4 (2024–present)", 2024, None, "legendary",  1000),
+            ]},
+            {"name": "Phantom", "class": "car", "generations": [
+                (8, "RR12 (2018–present)", 2018, None, "legendary",  500),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------- Aston Martin
+    {
+        "make": "Aston Martin", "country": "GB",
+        "models": [
+            {"name": "Vantage", "class": "car", "generations": [
+                (3, "AM28 (2018–present)", 2018, None, "legendary",  2000),
+            ]},
+            {"name": "DB11", "class": "car", "generations": [
+                (1, "AM29 (2016–present)", 2016, None, "legendary",  1500),
+            ]},
+            {"name": "DBX", "class": "suv", "generations": [
+                (1, "AM37 (2020–present)", 2020, None, "legendary",  2000),
+            ]},
+            {"name": "DBS", "class": "car", "generations": [
+                (3, "AM28D (2019–present)", 2019, None, "legendary",  600),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Bugatti
+    {
+        "make": "Bugatti", "country": "FR",
+        "models": [
+            {"name": "Chiron", "class": "car", "generations": [
+                (1, "Type 100 (2016–2024)", 2016, 2024, "legendary",  500),
+            ]},
+            {"name": "Tourbillon", "class": "car", "generations": [
+                (1, "Type 101 (2026–present)", 2026, None, "legendary",  250),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------------- Rivian
+    {
+        "make": "Rivian", "country": "US",
+        "models": [
+            {"name": "R1T", "class": "truck", "generations": [
+                (1, "Gen 1 (2022–present)", 2022, None, "rare",  15000),
+            ]},
+            {"name": "R1S", "class": "suv", "generations": [
+                (1, "Gen 1 (2022–present)", 2022, None, "rare",  12000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------------------- Lucid
+    {
+        "make": "Lucid", "country": "US",
+        "models": [
+            {"name": "Air", "class": "car", "generations": [
+                (1, "Gen 1 (2021–present)", 2021, None, "epic",  5000),
+            ]},
+            {"name": "Gravity", "class": "suv", "generations": [
+                (1, "Gen 1 (2024–present)", 2024, None, "epic",  3000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------------ Jaguar
+    {
+        "make": "Jaguar", "country": "GB",
+        "models": [
+            {"name": "F-Type", "class": "car", "generations": [
+                (1, "X152 (2013–present)", 2013, None, "epic",  5000),
+            ]},
+            {"name": "F-Pace", "class": "suv", "generations": [
+                (1, "X761 (2016–present)", 2016, None, "rare",  20000),
+            ]},
+            {"name": "I-Pace", "class": "suv", "generations": [
+                (1, "X590 (2018–present)", 2018, None, "rare",  8000),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Polestar
+    {
+        "make": "Polestar", "country": "SE",
+        "models": [
+            {"name": "Polestar 2", "class": "car", "generations": [
+                (1, "Gen 1 (2020–present)", 2020, None, "rare",  20000),
+            ]},
+            {"name": "Polestar 3", "class": "suv", "generations": [
+                (1, "Gen 1 (2024–present)", 2024, None, "rare",  10000),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Chrysler
+    {
+        "make": "Chrysler", "country": "US",
+        "models": [
+            {"name": "Pacifica", "class": "van", "generations": [
+                (2, "2nd Gen (2017–present)", 2017, None, "common",  100000),
+            ]},
+            {"name": "300", "class": "car", "generations": [
+                (2, "LD (2011–2023)", 2011, 2023, "uncommon",  50000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------------------- Buick
+    {
+        "make": "Buick", "country": "US",
+        "models": [
+            {"name": "Enclave", "class": "suv", "generations": [
+                (2, "C1 (2018–present)", 2018, None, "uncommon",  60000),
+            ]},
+            {"name": "Encore GX", "class": "suv", "generations": [
+                (1, "BT4 (2020–present)", 2020, None, "common",  80000),
+            ]},
+            {"name": "Envision", "class": "suv", "generations": [
+                (2, "LS (2021–present)", 2021, None, "common",  40000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------- Toyota (expanded)
+    {
+        "make": "Toyota", "country": "JP",
+        "models": [
+            {"name": "Sienna", "class": "van", "generations": [
+                (4, "XL40 (2021–present)", 2021, None, "common",  100000),
+            ]},
+            {"name": "Venza", "class": "suv", "generations": [
+                (2, "AV20 (2021–present)", 2021, None, "uncommon",  40000),
+            ]},
+            {"name": "Crown", "class": "car", "generations": [
+                (16, "S235 (2023–present)", 2023, None, "uncommon",  30000),
+            ]},
+            {"name": "Land Cruiser", "class": "suv", "generations": [
+                (11, "J300 (2022–present)", 2022, None, "rare",  10000),
+                (10, "J200 (2008–2021)",    2008, 2021, "uncommon",  15000),
+            ]},
+            {"name": "bZ4X", "class": "suv", "generations": [
+                (1, "XEA10 (2022–present)", 2022, None, "uncommon",  30000),
+            ]},
+            {"name": "GR Corolla", "class": "car", "generations": [
+                (1, "E210 GR (2023–present)", 2023, None, "epic",  6000),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Honda (expanded)
+    {
+        "make": "Honda", "country": "JP",
+        "models": [
+            {"name": "Odyssey", "class": "van", "generations": [
+                (5, "5th Gen (2018–present)", 2018, None, "common",  90000),
+            ]},
+            {"name": "HR-V", "class": "suv", "generations": [
+                (3, "3rd Gen (2023–present)", 2023, None, "common",  100000),
+            ]},
+            {"name": "Passport", "class": "suv", "generations": [
+                (2, "2nd Gen (2019–present)", 2019, None, "common",  60000),
+            ]},
+            {"name": "Prologue", "class": "suv", "generations": [
+                (1, "1st Gen (2024–present)", 2024, None, "uncommon",  20000),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Ford (expanded)
+    {
+        "make": "Ford", "country": "US",
+        "models": [
+            {"name": "Ranger", "class": "truck", "generations": [
+                (4, "P703 (2019–present)", 2019, None, "common",  90000),
+            ]},
+            {"name": "Expedition", "class": "suv", "generations": [
+                (4, "U553 (2018–present)", 2018, None, "common",  80000),
+            ]},
+            {"name": "F-150 Lightning", "class": "truck", "generations": [
+                (1, "Gen 1 (2022–present)", 2022, None, "rare",  25000),
+            ]},
+            {"name": "Mustang Mach-E", "class": "suv", "generations": [
+                (1, "Gen 1 (2021–present)", 2021, None, "uncommon",  40000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------- Chevrolet (expanded)
+    {
+        "make": "Chevrolet", "country": "US",
+        "models": [
+            {"name": "Camaro", "class": "car", "generations": [
+                (6, "6th Gen (2016–2024)", 2016, 2024, "uncommon",  50000),
+            ]},
+            {"name": "Suburban", "class": "suv", "generations": [
+                (12, "12th Gen (2021–present)", 2021, None, "common",  50000),
+            ]},
+            {"name": "Blazer EV", "class": "suv", "generations": [
+                (1, "EV Gen 1 (2024–present)", 2024, None, "uncommon",  20000),
+            ]},
+            {"name": "Trax", "class": "suv", "generations": [
+                (2, "2nd Gen (2024–present)", 2024, None, "common",  80000),
+            ]},
+            {"name": "Silverado EV", "class": "truck", "generations": [
+                (1, "Gen 1 (2024–present)", 2024, None, "rare",  20000),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- BMW (expanded)
+    {
+        "make": "BMW", "country": "DE",
+        "models": [
+            {"name": "2 Series", "class": "car", "generations": [
+                (2, "G42 (2022–present)", 2022, None, "uncommon",  30000),
+                (1, "F22 (2014–2021)",    2014, 2021, "uncommon",  25000),
+            ]},
+            {"name": "4 Series", "class": "car", "generations": [
+                (2, "G22 (2021–present)", 2021, None, "uncommon",  40000),
+            ]},
+            {"name": "7 Series", "class": "car", "generations": [
+                (7, "G70 (2023–present)", 2023, None, "rare",  15000),
+                (6, "G11 (2016–2022)",    2016, 2022, "rare",  18000),
+            ]},
+            {"name": "X1", "class": "suv", "generations": [
+                (3, "U11 (2023–present)", 2023, None, "uncommon",  80000),
+            ]},
+            {"name": "X7", "class": "suv", "generations": [
+                (1, "G07 (2019–present)", 2019, None, "rare",  20000),
+            ]},
+            {"name": "i4", "class": "car", "generations": [
+                (1, "G26 (2022–present)", 2022, None, "rare",  20000),
+            ]},
+            {"name": "iX", "class": "suv", "generations": [
+                (1, "I20 (2022–present)", 2022, None, "rare",  15000),
+            ]},
+            {"name": "M2", "class": "car", "generations": [
+                (2, "G87 (2023–present)", 2023, None, "epic",  8000),
+                (1, "F87 (2016–2021)",    2016, 2021, "epic",  10000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------- Mercedes (expanded)
+    {
+        "make": "Mercedes-Benz", "country": "DE",
+        "models": [
+            {"name": "GLC", "class": "suv", "generations": [
+                (2, "X254 (2023–present)", 2023, None, "uncommon",  80000),
+                (1, "X253 (2016–2022)",    2016, 2022, "uncommon",  100000),
+            ]},
+            {"name": "GLS", "class": "suv", "generations": [
+                (2, "X167 (2020–present)", 2020, None, "uncommon",  30000),
+            ]},
+            {"name": "EQS", "class": "car", "generations": [
+                (1, "V297 (2022–present)", 2022, None, "rare",  10000),
+            ]},
+            {"name": "AMG GT 63", "class": "car", "generations": [
+                (2, "X290 (2024–present)", 2024, None, "epic",  2000),
+            ]},
+            {"name": "Sprinter", "class": "van", "generations": [
+                (3, "W907 (2018–present)", 2018, None, "common",  50000),
+            ]},
+        ],
+    },
+    # ----------------------------------------------------------------- Audi (expanded)
+    {
+        "make": "Audi", "country": "DE",
+        "models": [
+            {"name": "Q7", "class": "suv", "generations": [
+                (2, "4M (2016–present)", 2016, None, "uncommon",  40000),
+            ]},
+            {"name": "Q8", "class": "suv", "generations": [
+                (1, "F1 (2019–present)", 2019, None, "rare",  20000),
+            ]},
+            {"name": "e-tron GT", "class": "car", "generations": [
+                (1, "F8 (2021–present)", 2021, None, "epic",  5000),
+            ]},
+            {"name": "RS6 Avant", "class": "car", "generations": [
+                (4, "C8 (2020–present)", 2020, None, "epic",  3000),
+            ]},
+            {"name": "A3", "class": "car", "generations": [
+                (4, "8Y (2021–present)", 2021, None, "common",  60000),
+            ]},
+            {"name": "Q4 e-tron", "class": "suv", "generations": [
+                (1, "F4B (2021–present)", 2021, None, "uncommon",  30000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------- VW (expanded)
+    {
+        "make": "Volkswagen", "country": "DE",
+        "models": [
+            {"name": "Atlas", "class": "suv", "generations": [
+                (1, "CA1 (2018–present)", 2018, None, "common",  80000),
+            ]},
+            {"name": "ID.4", "class": "suv", "generations": [
+                (1, "E21 (2021–present)", 2021, None, "uncommon",  50000),
+            ]},
+            {"name": "Taos", "class": "suv", "generations": [
+                (1, "1st Gen (2022–present)", 2022, None, "common",  50000),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------------- Nissan (expanded)
+    {
+        "make": "Nissan", "country": "JP",
+        "models": [
+            {"name": "Pathfinder", "class": "suv", "generations": [
+                (5, "R53 (2022–present)", 2022, None, "common",  80000),
+            ]},
+            {"name": "Murano", "class": "suv", "generations": [
+                (3, "Z52 (2015–present)", 2015, None, "uncommon",  60000),
+            ]},
+            {"name": "Kicks", "class": "suv", "generations": [
+                (2, "P15F (2023–present)", 2023, None, "common",  80000),
+            ]},
+            {"name": "Sentra", "class": "car", "generations": [
+                (8, "B18 (2020–present)", 2020, None, "common",  100000),
+            ]},
+            {"name": "Ariya", "class": "suv", "generations": [
+                (1, "FE0 (2023–present)", 2023, None, "uncommon",  20000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------ Subaru (expanded)
+    {
+        "make": "Subaru", "country": "JP",
+        "models": [
+            {"name": "Ascent", "class": "suv", "generations": [
+                (1, "1st Gen (2019–present)", 2019, None, "common",  60000),
+            ]},
+            {"name": "Crosstrek", "class": "suv", "generations": [
+                (4, "4th Gen (2024–present)", 2024, None, "common",  80000),
+                (3, "3rd Gen (2018–2023)",    2018, 2023, "common",  100000),
+            ]},
+            {"name": "Legacy", "class": "car", "generations": [
+                (7, "BN/BS (2020–present)", 2020, None, "common",  40000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------ Hyundai (expanded)
+    {
+        "make": "Hyundai", "country": "KR",
+        "models": [
+            {"name": "Palisade", "class": "suv", "generations": [
+                (1, "LX2 (2020–present)", 2020, None, "common",  80000),
+            ]},
+            {"name": "Santa Fe", "class": "suv", "generations": [
+                (5, "MX5 (2024–present)", 2024, None, "common",  100000),
+                (4, "TM (2019–2023)",     2019, 2023, "common",  120000),
+            ]},
+            {"name": "Kona", "class": "suv", "generations": [
+                (2, "SX2 (2024–present)", 2024, None, "common",  80000),
+            ]},
+            {"name": "NEXO", "class": "suv", "generations": [
+                (1, "FE (2019–present)", 2019, None, "rare",  2000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------------- Kia (expanded)
+    {
+        "make": "Kia", "country": "KR",
+        "models": [
+            {"name": "Sorento", "class": "suv", "generations": [
+                (4, "MQ4 (2021–present)", 2021, None, "common",  100000),
+            ]},
+            {"name": "Carnival", "class": "van", "generations": [
+                (4, "KA4 (2022–present)", 2022, None, "common",  50000),
+            ]},
+            {"name": "Seltos", "class": "suv", "generations": [
+                (1, "SP2 (2021–present)", 2021, None, "common",  80000),
+            ]},
+            {"name": "EV9", "class": "suv", "generations": [
+                (1, "MV (2024–present)", 2024, None, "uncommon",  20000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------------- Mazda (expanded)
+    {
+        "make": "Mazda", "country": "JP",
+        "models": [
+            {"name": "CX-90", "class": "suv", "generations": [
+                (1, "1st Gen (2024–present)", 2024, None, "uncommon",  30000),
+            ]},
+            {"name": "CX-30", "class": "suv", "generations": [
+                (1, "DM (2020–present)", 2020, None, "common",  60000),
+            ]},
+            {"name": "MX-30", "class": "suv", "generations": [
+                (1, "DR (2021–present)", 2021, None, "rare",  5000),
+            ]},
+        ],
+    },
+    # ------------------------------------------------------------- Lexus (expanded)
+    {
+        "make": "Lexus", "country": "JP",
+        "models": [
+            {"name": "NX", "class": "suv", "generations": [
+                (2, "AZ20 (2022–present)", 2022, None, "uncommon",  70000),
+                (1, "AZ10 (2015–2021)",    2015, 2021, "uncommon",  80000),
+            ]},
+            {"name": "GX", "class": "suv", "generations": [
+                (3, "J250 (2024–present)", 2024, None, "uncommon",  20000),
+                (2, "J150 (2010–2024)",    2010, 2024, "uncommon",  25000),
+            ]},
+            {"name": "LX", "class": "suv", "generations": [
+                (4, "J300 (2022–present)", 2022, None, "rare",  5000),
+            ]},
+            {"name": "ES", "class": "car", "generations": [
+                (7, "XV70 (2019–present)", 2019, None, "uncommon",  50000),
+            ]},
+            {"name": "UX", "class": "suv", "generations": [
+                (1, "ZA10 (2019–present)", 2019, None, "uncommon",  20000),
+            ]},
+            {"name": "LFA", "class": "car", "generations": [
+                (1, "XF10 (2010–2012)", 2010, 2012, "legendary",  500),
+            ]},
+        ],
+    },
+    # ---------------------------------------------------------- Porsche (expanded)
+    {
+        "make": "Porsche", "country": "DE",
+        "models": [
+            {"name": "718 Cayman", "class": "car", "generations": [
+                (1, "982 (2016–present)", 2016, None, "epic",  10000),
+            ]},
+            {"name": "718 Boxster", "class": "car", "generations": [
+                (1, "982 Boxster (2016–present)", 2016, None, "epic",  8000),
+            ]},
+            {"name": "Panamera", "class": "car", "generations": [
+                (2, "G2 (2017–present)", 2017, None, "rare",  15000),
+            ]},
+            {"name": "911 GT3", "class": "car", "generations": [
+                (8, "992 GT3 (2022–present)", 2022, None, "legendary",  4000),
+            ]},
+        ],
+    },
+    # --------------------------------------------------------- Cadillac (expanded)
+    {
+        "make": "Cadillac", "country": "US",
+        "models": [
+            {"name": "CT4", "class": "car", "generations": [
+                (1, "1st Gen (2020–present)", 2020, None, "uncommon",  15000),
+            ]},
+            {"name": "XT5", "class": "suv", "generations": [
+                (1, "1st Gen (2017–present)", 2017, None, "uncommon",  50000),
+            ]},
+            {"name": "XT6", "class": "suv", "generations": [
+                (1, "1st Gen (2020–present)", 2020, None, "uncommon",  30000),
+            ]},
+            {"name": "Lyriq", "class": "suv", "generations": [
+                (1, "1st Gen (2023–present)", 2023, None, "rare",  15000),
+            ]},
+        ],
+    },
+    # -------------------------------------------------------- Koenigsegg / Pagani
+    {
+        "make": "Koenigsegg", "country": "SE",
+        "models": [
+            {"name": "Agera RS", "class": "car", "generations": [
+                (1, "2015–2018", 2015, 2018, "legendary",  25),
+            ]},
+            {"name": "Jesko", "class": "car", "generations": [
+                (1, "2021–present", 2021, None, "legendary",  125),
+            ]},
+        ],
+    },
+    {
+        "make": "Pagani", "country": "IT",
+        "models": [
+            {"name": "Huayra", "class": "car", "generations": [
+                (1, "C9 (2013–present)", 2013, None, "legendary",  100),
+            ]},
+            {"name": "Utopia", "class": "car", "generations": [
+                (1, "C10 (2023–present)", 2023, None, "legendary",  99),
+            ]},
+        ],
+    },
 ]
 
 

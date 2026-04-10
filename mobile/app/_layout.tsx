@@ -17,6 +17,7 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="highway" options={{ presentation: 'fullScreenModal' }} />
             <Stack.Screen name="scan360" options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="vehicle/[id]" options={{ presentation: 'card' }} />
           </Stack>
         </QueryClientProvider>
       </SafeAreaProvider>
