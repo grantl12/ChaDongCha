@@ -1,13 +1,27 @@
+import { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useCatchStore } from '@/stores/catchStore';
+import { apiClient } from '@/api/client';
 
 const XP_PER_LEVEL = 1000;
 
 export default function ProfileScreen() {
-  const { xp, level, username, clearSession } = usePlayerStore();
+  const { xp, level, username, userId, clearSession, setPlayer, setProfile, accessToken } = usePlayerStore();
   const catchCount = useCatchStore(s => s.catches.length);
+
+  // Re-sync profile from server each time this tab is focused
+  useFocusEffect(useCallback(() => {
+    if (!accessToken) return;
+    apiClient.get('/auth/me')
+      .then((profile: any) => {
+        if (userId) setPlayer({ userId, username: profile.username, accessToken });
+        setProfile(profile.xp, profile.level);
+      })
+      .catch(() => { /* keep cached values on failure */ });
+  }, [accessToken]));
 
   const xpIntoLevel  = xp % XP_PER_LEVEL;
   const xpProgress   = xpIntoLevel / XP_PER_LEVEL;
@@ -52,9 +66,14 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.signOutButton} onPress={handleSignOut}>
-        <Text style={styles.signOutText}>SIGN OUT</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable style={styles.leaderboardButton} onPress={() => router.push('/leaderboard')}>
+          <Text style={styles.leaderboardText}>LEADERBOARD</Text>
+        </Pressable>
+        <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+          <Text style={styles.signOutText}>SIGN OUT</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -74,6 +93,9 @@ const styles = StyleSheet.create({
   statValue:      { color: '#fff', fontSize: 22, fontWeight: '800' },
   statLabel:      { color: '#555', fontSize: 11, letterSpacing: 2, marginTop: 2 },
   statDivider:    { width: 1, backgroundColor: '#1a1a1a' },
-  signOutButton:  { borderWidth: 1, borderColor: '#222', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
-  signOutText:    { color: '#555', fontSize: 13, letterSpacing: 2, fontWeight: '700' },
+  actions:          { gap: 10 },
+  leaderboardButton:{ backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  leaderboardText:  { color: '#fff', fontSize: 13, letterSpacing: 2, fontWeight: '700' },
+  signOutButton:    { borderWidth: 1, borderColor: '#222', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  signOutText:      { color: '#555', fontSize: 13, letterSpacing: 2, fontWeight: '700' },
 });

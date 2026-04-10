@@ -69,18 +69,19 @@ export default function MapScreen() {
     }
   }
 
-  // Build GeoJSON for owned road segments (those with a king)
-  const ownedFeatures: GeoJSON.FeatureCollection = {
+  // Build GeoJSON for all road segments — unclaimed + owned
+  // status: 'mine' | 'theirs' | 'unclaimed'
+  const allFeatures: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
     features: segments
-      .filter(s => s.king_id && s.geometry)
+      .filter(s => s.geometry)
       .map(s => ({
         type: 'Feature' as const,
         id: s.id,
         geometry: s.geometry!,
         properties: {
-          isMe: s.king_id === userId,
-          kingName: s.players?.username ?? '—',
+          status:   s.king_id ? (s.king_id === userId ? 'mine' : 'theirs') : 'unclaimed',
+          kingName: s.players?.username ?? null,
         },
       })),
   };
@@ -108,21 +109,25 @@ export default function MapScreen() {
             pulsing={{ isEnabled: true, color: '#e63946' }}
           />
 
-          {/* Owned road segments — glowing lines */}
-          {ownedFeatures.features.length > 0 && (
+          {/* All road segments — unclaimed dim, owned glowing */}
+          {allFeatures.features.length > 0 && (
             <ShapeSource
-              id="owned-roads"
-              shape={ownedFeatures}
+              id="all-roads"
+              shape={allFeatures}
               onPress={e => {
                 const id = e.features?.[0]?.id as string | undefined;
                 if (id) handleSegmentPress(id);
               }}
             >
-              {/* Glow layer underneath */}
+              {/* Glow layer — only on owned roads */}
               <LineLayer
                 id="road-glow"
                 style={{
-                  lineColor: ['case', ['get', 'isMe'], '#e63946', '#4a9eff'],
+                  lineColor: ['case',
+                    ['==', ['get', 'status'], 'mine'],    '#e63946',
+                    ['==', ['get', 'status'], 'theirs'],  '#4a9eff',
+                    'transparent',
+                  ],
                   lineWidth: 8,
                   lineOpacity: 0.15,
                   lineBlur: 4,
@@ -132,9 +137,19 @@ export default function MapScreen() {
               <LineLayer
                 id="road-line"
                 style={{
-                  lineColor: ['case', ['get', 'isMe'], '#e63946', '#4a9eff'],
-                  lineWidth: 2.5,
-                  lineOpacity: 0.9,
+                  lineColor: ['case',
+                    ['==', ['get', 'status'], 'mine'],    '#e63946',
+                    ['==', ['get', 'status'], 'theirs'],  '#4a9eff',
+                    '#2a2a2a',
+                  ],
+                  lineWidth: ['case',
+                    ['==', ['get', 'status'], 'unclaimed'], 1.5,
+                    2.5,
+                  ],
+                  lineOpacity: ['case',
+                    ['==', ['get', 'status'], 'unclaimed'], 0.5,
+                    0.9,
+                  ],
                 }}
               />
             </ShapeSource>
