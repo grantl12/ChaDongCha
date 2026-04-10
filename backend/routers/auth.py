@@ -60,7 +60,7 @@ async def me_info(authorization: str = Header(...)):
     token = authorization.replace("Bearer ", "")
     try:
         auth_result = db.auth.get_user(token)
-        if not auth_result.user:
+        if not auth_result or not auth_result.user:
             raise ValueError("no user in response")
         user_id = auth_result.user.id
     except Exception:

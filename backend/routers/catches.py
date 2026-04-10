@@ -58,7 +58,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     token = authorization.replace("Bearer ", "")
     try:
         auth_result = db.auth.get_user(token)
-        if not auth_result.user:
+        if not auth_result or not auth_result.user:
             raise ValueError("no user in response")
         player_id = auth_result.user.id
     except Exception:
