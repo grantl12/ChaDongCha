@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from db import get_client
-from services.xp_service import compute_xp, apply_xp, session_catch_count
+from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
 
@@ -138,12 +138,17 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         }
 
     # XP computation
+    boost_result   = get_orbital_boost(db, player_id) if body.catch_type != "space" else None
+    orbital_boost  = boost_result[0] if boost_result else 1.0
+    boost_remaining = boost_result[1] if boost_result else 0
+
     xp_earned, xp_reasons = compute_xp(
         catch_type=body.catch_type,
         generation_id=body.generation_id,
         rarity_tier=_get_rarity(db, body.generation_id),
         is_personal_first=_is_personal_first(db, player_id, body.generation_id),
         session_same_gen_count=same_gen_count,
+        orbital_boost=orbital_boost,
     )
     new_total_xp, level_up, new_level = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
 
@@ -168,6 +173,8 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "level_up": level_up,
         "road_king_claimed": road_king_claimed,
         "first_finder_awarded": first_finder_awarded,
+        "orbital_boost_active": orbital_boost > 1.0,
+        "orbital_boost_remaining_min": boost_remaining,
         "duplicate": False,
     }
 

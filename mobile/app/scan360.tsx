@@ -6,6 +6,12 @@ import * as Haptics from 'expo-haptics';
 import { useCatchStore } from '@/stores/catchStore';
 import { VehicleClassifier, VehicleClassifierStub, ClassifyResult } from '@/modules/vehicle-classifier';
 import { useLocation } from '@/hooks/useLocation';
+import { usePlayerStore } from '@/stores/playerStore';
+
+function boostRemainingMin(expires: string | null): number {
+  if (!expires) return 0;
+  return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
+}
 
 // Auto-detect native module — falls back to stub until Phase 5 implementation
 const Classifier = NativeModules.VehicleClassifierModule
@@ -19,6 +25,8 @@ export default function Scan360Screen() {
   const device = useCameraDevice('back');
   const { addCatch } = useCatchStore();
   const { fuzzyCity } = useLocation();
+  const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
+  const boostMins = boostRemainingMin(orbitalBoostExpires);
 
   const [captured, setCaptured]     = useState<Set<Anchor>>(new Set());
   const [currentAnchor, setCurrentAnchor] = useState<Anchor>('FRONT');
@@ -68,6 +76,13 @@ export default function Scan360Screen() {
   return (
     <View style={styles.container}>
       <Camera style={StyleSheet.absoluteFill} device={device} isActive />
+
+      {/* Orbital Boost indicator */}
+      {boostMins > 0 && (
+        <View style={styles.boostPill}>
+          <Text style={styles.boostPillText}>⚡ BOOST ACTIVE · {boostMins}m</Text>
+        </View>
+      )}
 
       {/* Anchor progress dots */}
       <View style={styles.progressRow}>
@@ -148,6 +163,8 @@ const styles = StyleSheet.create({
   captureInner:      { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
   exitButton:        { position: 'absolute', top: 60, left: 24 },
   exitText:          { color: '#ffffff66', fontSize: 13, letterSpacing: 2 },
+  boostPill:         { position: 'absolute', top: 60, right: 24, backgroundColor: '#1a120088', borderWidth: 1, borderColor: '#f59e0b88', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  boostPillText:     { color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   resultOverlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0a0a0aee', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 32, gap: 4 },
   resultMake:        { color: '#888', fontSize: 14, letterSpacing: 2 },
   resultModel:       { color: '#fff', fontSize: 32, fontWeight: '900' },

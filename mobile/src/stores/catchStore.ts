@@ -32,6 +32,8 @@ type CatchResponse  = {
   level_up: boolean;
   road_king_claimed: boolean;
   first_finder_awarded: string | null;
+  orbital_boost_active: boolean;
+  orbital_boost_remaining_min: number;
   duplicate: boolean;
 };
 
@@ -110,6 +112,11 @@ export const useCatchStore = create<CatchStore>()(
                 res.xp_earned,
                 res.level_up ? res.new_level : undefined,
               );
+            }
+
+            // Activate orbital boost if a space catch just triggered one
+            if (res.orbital_boost_active && res.orbital_boost_remaining_min > 0) {
+              usePlayerStore.getState().activateOrbitalBoost(res.orbital_boost_remaining_min);
             }
 
             set(s => ({

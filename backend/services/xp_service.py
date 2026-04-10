@@ -1,6 +1,16 @@
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 
+# Orbital Boost — multiplier and duration earned by catching a space object.
+# Applies to all subsequent vehicle catches within the window.
+ORBITAL_BOOST_MULTIPLIERS = {
+    "legendary": (2.00, 60),
+    "epic":      (1.75, 45),
+    "rare":      (1.50, 30),
+    "uncommon":  (1.25, 20),
+    "common":    (1.25, 20),
+}
+
 # XP table from brief §9.1
 _HIGHWAY_XP = {
     "common": 40,
@@ -42,12 +52,49 @@ def _diminish_multiplier(session_count: int) -> float:
     return _SESSION_DIMINISH[idx]
 
 
+def get_orbital_boost(db, player_id: str) -> tuple[float, int] | None:
+    """
+    Return (multiplier, minutes_remaining) if the player has an active Orbital
+    Boost (caught a space object within its boost window), else None.
+    Checks the most recent space catch and its space_object rarity tier.
+    """
+    result = db.table("catches") \
+        .select("caught_at, space_objects(rarity_tier)") \
+        .eq("player_id", player_id) \
+        .eq("catch_type", "space") \
+        .order("caught_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if not result.data:
+        return None
+
+    row = result.data[0]
+    caught_at_str = row.get("caught_at", "")
+    try:
+        caught_at = datetime.fromisoformat(caught_at_str.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+    space_obj = row.get("space_objects") or {}
+    rarity = space_obj.get("rarity_tier", "common") if space_obj else "common"
+    multiplier, duration_min = ORBITAL_BOOST_MULTIPLIERS.get(rarity, (1.25, 20))
+
+    elapsed_min = (datetime.now(timezone.utc) - caught_at).total_seconds() / 60
+    if elapsed_min >= duration_min:
+        return None
+
+    remaining_min = int(duration_min - elapsed_min)
+    return multiplier, remaining_min
+
+
 def compute_xp(
     catch_type: str,
     generation_id: Optional[str],
     rarity_tier: Optional[str],
     is_personal_first: bool = False,
     session_same_gen_count: int = 0,
+    orbital_boost: float = 1.0,
 ) -> tuple[int, list[str]]:
     reasons: list[str] = []
     xp = 0
@@ -73,6 +120,11 @@ def compute_xp(
     if is_personal_first and xp > 0:
         xp = int(xp * PERSONAL_FIRST_MULTIPLIER)
         reasons.append("personal_first_catch")
+
+    # Orbital Boost — applied after personal-first so both stack
+    if orbital_boost > 1.0 and xp > 0 and catch_type != "space":
+        xp = int(xp * orbital_boost)
+        reasons.append(f"orbital_boost_x{orbital_boost:.2f}")
 
     # Diminishing XP for same-generation repeats in the session window.
     # Personal-first multiplier is applied before diminishing so the

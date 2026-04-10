@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useLocation } from '@/hooks/useLocation';
 import { useCatchStore } from '@/stores/catchStore';
+import { usePlayerStore } from '@/stores/playerStore';
 import {
   VehicleClassifier,
   VehicleClassifierStub,
@@ -23,10 +24,17 @@ const FRAME_INTERVAL_MS     = 1000 / TRIGGER_FPS;
 const CONFIDENCE_AUTO_CATCH = 0.72;
 const CONFIDENCE_PROBABLE   = 0.50;
 
+function boostRemainingMin(expires: string | null): number {
+  if (!expires) return 0;
+  return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
+}
+
 export default function HighwayMode() {
   const device = useCameraDevice('back');
   const { speedMph, fuzzyCity } = useLocation();
   const { addCatch } = useCatchStore();
+  const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
+  const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
 
   const isMoving       = speedMph > SPEED_THRESHOLD_MPH;
   const lastFrameTime  = useSharedValue(0);
@@ -99,6 +107,13 @@ export default function HighwayMode() {
         <Text style={styles.safetyText}>KEEP EYES ON ROAD</Text>
       </View>
 
+      {/* Orbital Boost indicator */}
+      {boostActive && (
+        <View style={styles.boostPill}>
+          <Text style={styles.boostPillText}>⚡ BOOST ACTIVE · {boostRemainingMin(orbitalBoostExpires)}m</Text>
+        </View>
+      )}
+
       {/* HUD dims above 15 mph — minimal radar indicator only */}
       {isMoving ? (
         <View style={styles.minimalHud}>
@@ -146,4 +161,6 @@ const styles = StyleSheet.create({
   catchText:    { color: '#fff', fontWeight: '700', fontSize: 15, textAlign: 'center' },
   exitButton:   { position: 'absolute', top: 60, right: 24 },
   exitText:     { color: '#ffffff66', fontSize: 13, letterSpacing: 2 },
+  boostPill:    { position: 'absolute', top: 60, left: 24, backgroundColor: '#1a120088', borderWidth: 1, borderColor: '#f59e0b88', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  boostPillText:{ color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 });

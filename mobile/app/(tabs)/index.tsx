@@ -1,8 +1,11 @@
 import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { useLocation } from '@/hooks/useLocation';
+import { useCatchStore } from '@/stores/catchStore';
+import { usePlayerStore } from '@/stores/playerStore';
 
 type CatchableObject = {
   id: string;
@@ -10,6 +13,7 @@ type CatchableObject = {
   pass_end: string;
   max_elevation: number;
   space_objects: {
+    id: string;
     name: string;
     object_type: string;
     rarity_tier: string;
@@ -32,12 +36,22 @@ function timeUntil(iso: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
 }
 
-function SatelliteRow({ item }: { item: CatchableObject }) {
+function boostRemaining(expires: string | null): number {
+  if (!expires) return 0;
+  return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
+}
+
+function SatelliteRow({ item, onCatch }: { item: CatchableObject; onCatch: (item: CatchableObject) => void }) {
   const obj    = item.space_objects;
   const rarity = obj?.rarity_tier ?? 'common';
   const color  = RARITY_COLOR[rarity] ?? '#555';
-  const until  = timeUntil(item.pass_start);
+  const [until, setUntil] = useState(() => timeUntil(item.pass_start));
   const isNow  = until === 'NOW';
+
+  useEffect(() => {
+    const t = setInterval(() => setUntil(timeUntil(item.pass_start)), 1000);
+    return () => clearInterval(t);
+  }, [item.pass_start]);
 
   return (
     <View style={styles.satRow}>
@@ -48,7 +62,35 @@ function SatelliteRow({ item }: { item: CatchableObject }) {
       </View>
       <View style={styles.satRight}>
         <Text style={[styles.satCountdown, isNow && styles.satCountdownNow]}>{until}</Text>
-        {isNow && <Text style={styles.satCatchable}>CATCHABLE</Text>}
+        {isNow ? (
+          <Pressable style={styles.catchBtn} onPress={() => onCatch(item)}>
+            <Text style={styles.catchBtnText}>CATCH</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.satCatchable}>INCOMING</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function OrbitalBoostBanner({ expires }: { expires: string | null }) {
+  const [remaining, setRemaining] = useState(() => boostRemaining(expires));
+
+  useEffect(() => {
+    setRemaining(boostRemaining(expires));
+    const t = setInterval(() => setRemaining(boostRemaining(expires)), 30_000);
+    return () => clearInterval(t);
+  }, [expires]);
+
+  if (remaining <= 0) return null;
+
+  return (
+    <View style={styles.boostBanner}>
+      <Text style={styles.boostIcon}>⚡</Text>
+      <View>
+        <Text style={styles.boostTitle}>ORBITAL BOOST ACTIVE</Text>
+        <Text style={styles.boostSub}>XP multiplier on all vehicle catches · {remaining}m remaining</Text>
       </View>
     </View>
   );
@@ -56,6 +98,9 @@ function SatelliteRow({ item }: { item: CatchableObject }) {
 
 export default function RadarScreen() {
   const { latitude, longitude } = useLocation();
+  const addCatch = useCatchStore(s => s.addCatch);
+  const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
+  const [caught, setCaught] = useState<Set<string>>(new Set());
 
   const satQuery = useQuery({
     queryKey: ['satellites', latitude, longitude],
@@ -69,8 +114,25 @@ export default function RadarScreen() {
 
   const satellites = satQuery.data ?? [];
 
+  function handleCatch(item: CatchableObject) {
+    if (caught.has(item.id)) return;
+    setCaught(prev => new Set(prev).add(item.id));
+    const obj = item.space_objects;
+    addCatch({
+      make:        'Space Object',
+      model:       obj?.name ?? 'Unknown',
+      generation:  obj?.name ?? 'Unknown',
+      bodyStyle:   obj?.object_type ?? 'satellite',
+      color:       'N/A',
+      confidence:  1.0,
+      catchType:   'space',
+    });
+  }
+
   return (
     <View style={styles.container}>
+      <OrbitalBoostBanner expires={orbitalBoostExpires} />
+
       {/* Mode entry buttons */}
       <View style={styles.modeSection}>
         <Text style={styles.title}>RADAR</Text>
@@ -104,7 +166,12 @@ export default function RadarScreen() {
           <FlatList
             data={satellites}
             keyExtractor={item => item.id}
-            renderItem={({ item }) => <SatelliteRow item={item} />}
+            renderItem={({ item }) => (
+              <SatelliteRow
+                item={item}
+                onCatch={handleCatch}
+              />
+            )}
             scrollEnabled={false}
           />
         )}
@@ -115,6 +182,12 @@ export default function RadarScreen() {
 
 const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#0a0a0a', padding: 24, paddingTop: 70 },
+
+  boostBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 20 },
+  boostIcon:        { fontSize: 20 },
+  boostTitle:       { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+  boostSub:         { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
+
   modeSection:      { gap: 12, marginBottom: 40 },
   title:            { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 4 },
   subtitle:         { color: '#444', fontSize: 12, marginBottom: 8 },
@@ -122,6 +195,7 @@ const styles = StyleSheet.create({
   secondaryButton:  { backgroundColor: '#141414', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: '#222' },
   buttonText:       { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
   buttonSub:        { color: '#ffffff66', fontSize: 12, marginTop: 3 },
+
   satSection:       { flex: 1 },
   satHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   satTitle:         { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
@@ -131,8 +205,11 @@ const styles = StyleSheet.create({
   satBody:          { flex: 1, gap: 3 },
   satName:          { color: '#fff', fontSize: 14, fontWeight: '700' },
   satType:          { color: '#444', fontSize: 12 },
-  satRight:         { alignItems: 'flex-end', gap: 2 },
+  satRight:         { alignItems: 'flex-end', gap: 4 },
   satCountdown:     { color: '#555', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   satCountdownNow:  { color: '#e63946' },
-  satCatchable:     { color: '#e63946', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  satCatchable:     { color: '#333', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+
+  catchBtn:         { backgroundColor: '#e63946', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 12 },
+  catchBtnText:     { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
 });
