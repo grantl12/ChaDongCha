@@ -1,10 +1,12 @@
-import { useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Switch, TextInput, Alert } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useCatchStore } from '@/stores/catchStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/api/client';
+import { sha256Plate } from '@/utils/plateHash';
 
 // ─── Level math (mirrors backend _level_for_xp) ────────────────────────────
 // Bands: [level, xpMin, xpMax | null]
@@ -132,6 +134,48 @@ export default function ProfileScreen() {
     clearSession, setPlayer, setProfile,
     accessToken, orbitalBoostExpires,
   } = usePlayerStore();
+  const { privacyShieldEnabled, togglePrivacyShield } = useSettingsStore();
+  const queryClient = useQueryClient();
+  const [plateInput, setPlateInput] = useState('');
+  const [plateLabel, setPlateLabel] = useState('');
+  const [addingPlate, setAddingPlate] = useState(false);
+  const [showPlateForm, setShowPlateForm] = useState(false);
+
+  const { data: plateHashes, refetch: refetchPlates } = useQuery<{ id: string; label: string | null; created_at: string }[]>({
+    queryKey: ['plate-hashes', userId],
+    queryFn:  () => apiClient.get('/players/plate-hashes') as Promise<{ id: string; label: string | null; created_at: string }[]>,
+    enabled:  !!accessToken,
+  });
+
+  async function handleAddPlate() {
+    if (!plateInput.trim()) return;
+    setAddingPlate(true);
+    try {
+      const hash = await sha256Plate(plateInput.trim());
+      await apiClient.post('/players/plate-hashes', {
+        plate_hash: hash,
+        label: plateLabel.trim() || null,
+      });
+      setPlateInput('');
+      setPlateLabel('');
+      setShowPlateForm(false);
+      refetchPlates();
+    } catch (e: any) {
+      const msg = e?.message ?? '';
+      Alert.alert('Error', msg.includes('409') ? 'That plate is already registered.' : 'Could not register plate.');
+    } finally {
+      setAddingPlate(false);
+    }
+  }
+
+  async function handleRemovePlate(id: string) {
+    try {
+      await apiClient.delete(`/players/plate-hashes/${id}`);
+      refetchPlates();
+    } catch {
+      Alert.alert('Error', 'Could not remove plate.');
+    }
+  }
 
   // Re-sync from server each focus
   useFocusEffect(useCallback(() => {
@@ -239,6 +283,88 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {/* My Plates */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>MY PLATES</Text>
+          <Pressable onPress={() => setShowPlateForm(v => !v)}>
+            <Text style={styles.sectionAction}>{showPlateForm ? 'CANCEL' : '+ ADD'}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.plateHint}>
+          Register your plate. When another player catches your car, they earn bonus XP — and you'll be notified.
+          Your plate is hashed on-device and never leaves it.
+        </Text>
+
+        {showPlateForm && (
+          <View style={styles.plateForm}>
+            <TextInput
+              style={styles.plateInput}
+              placeholder="Plate number (e.g. ABC 1234)"
+              placeholderTextColor="#444"
+              value={plateInput}
+              onChangeText={setPlateInput}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <TextInput
+              style={styles.plateInput}
+              placeholder="Label (optional — e.g. Daily driver)"
+              placeholderTextColor="#444"
+              value={plateLabel}
+              onChangeText={setPlateLabel}
+              autoCorrect={false}
+            />
+            <Pressable
+              style={[styles.plateAddBtn, addingPlate && { opacity: 0.6 }]}
+              onPress={handleAddPlate}
+              disabled={addingPlate}
+            >
+              {addingPlate
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.plateAddBtnText}>REGISTER</Text>
+              }
+            </Pressable>
+          </View>
+        )}
+
+        {(plateHashes ?? []).length === 0 && !showPlateForm && (
+          <Text style={styles.emptyHint}>No plates registered yet.</Text>
+        )}
+
+        {(plateHashes ?? []).map(ph => (
+          <View key={ph.id} style={styles.plateRow}>
+            <View style={styles.plateDot} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.plateLabel}>{ph.label ?? 'Plate'}</Text>
+              <Text style={styles.plateDate}>
+                Registered {new Date(ph.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </Text>
+            </View>
+            <Pressable onPress={() => handleRemovePlate(ph.id)} hitSlop={12}>
+              <Text style={styles.plateRemove}>REMOVE</Text>
+            </Pressable>
+          </View>
+        ))}
+      </View>
+
+      {/* Settings */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>SETTINGS</Text>
+        <View style={styles.settingRow}>
+          <View style={styles.settingBody}>
+            <Text style={styles.settingLabel}>Privacy Shield</Text>
+            <Text style={styles.settingDesc}>Redacts occupants and interiors in the camera feed</Text>
+          </View>
+          <Switch
+            value={privacyShieldEnabled}
+            onValueChange={togglePrivacyShield}
+            trackColor={{ false: '#222', true: '#e63946' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </View>
+
       {/* Actions */}
       <View style={styles.actions}>
         <Pressable style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
@@ -303,6 +429,24 @@ const styles = StyleSheet.create({
   badgeName:         { color: '#fff', fontSize: 14, fontWeight: '700' },
   badgeVehicle:      { color: '#555', fontSize: 12 },
   badgeRegion:       { color: '#333', fontSize: 11 },
+
+  sectionHeaderRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionAction:     { color: '#e63946', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  plateHint:         { color: '#333', fontSize: 12, lineHeight: 17 },
+  plateForm:         { gap: 8, marginTop: 4 },
+  plateInput:        { backgroundColor: '#141414', color: '#fff', borderRadius: 8, padding: 12, fontSize: 14, borderWidth: 1, borderColor: '#222' },
+  plateAddBtn:       { backgroundColor: '#e63946', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  plateAddBtnText:   { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
+  plateRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111', gap: 12 },
+  plateDot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: '#e63946' },
+  plateLabel:        { color: '#fff', fontSize: 14, fontWeight: '600' },
+  plateDate:         { color: '#333', fontSize: 11, marginTop: 2 },
+  plateRemove:       { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+
+  settingRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111' },
+  settingBody:       { flex: 1, gap: 3 },
+  settingLabel:      { color: '#fff', fontSize: 14, fontWeight: '600' },
+  settingDesc:       { color: '#444', fontSize: 12, lineHeight: 16 },
 
   actions:           { gap: 10, marginTop: 8 },
   actionButton:      { backgroundColor: '#111', borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },

@@ -7,6 +7,8 @@ import { useCatchStore } from '@/stores/catchStore';
 import { VehicleClassifier, VehicleClassifierStub, ClassifyResult } from '@/modules/vehicle-classifier';
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { PrivacyShield } from '@/components/PrivacyShield';
 
 function boostRemainingMin(expires: string | null): number {
   if (!expires) return 0;
@@ -27,6 +29,7 @@ export default function Scan360Screen() {
   const { fuzzyCity } = useLocation();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostMins = boostRemainingMin(orbitalBoostExpires);
+  const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
 
   const [captured, setCaptured]     = useState<Set<Anchor>>(new Set());
   const [currentAnchor, setCurrentAnchor] = useState<Anchor>('FRONT');
@@ -76,6 +79,7 @@ export default function Scan360Screen() {
   return (
     <View style={styles.container}>
       <Camera style={StyleSheet.absoluteFill} device={device} isActive />
+      <PrivacyShield enabled={privacyShieldEnabled} />
 
       {/* Orbital Boost indicator */}
       {boostMins > 0 && (

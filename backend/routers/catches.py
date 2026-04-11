@@ -10,7 +10,10 @@ from services.first_finder_service import check_first_finder
 from services.notification_service import (
     notify_road_king_taken, notify_road_king_claimed,
     notify_level_up, notify_first_finder,
+    notify_spotted, notify_spotter_award,
 )
+
+SPOTTER_XP = 150   # bonus XP for catching a registered plate
 
 # --- Dedup configuration ---
 HASH_DEDUP_MIN_PLATE_CONFIDENCE = 0.85
@@ -189,6 +192,26 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     if level_up:
         notify_level_up(db, player_id, new_level)
 
+    # Plate hash match — check if this vehicle_hash matches an opted-in plate
+    spotter_bonus_xp = 0
+    if body.vehicle_hash and (body.alpr_plate_confidence or 0) >= HASH_DEDUP_MIN_PLATE_CONFIDENCE:
+        plate_match = _check_plate_hash(db, body.vehicle_hash, player_id)
+        if plate_match:
+            # Award Spotter XP to catcher
+            spotter_bonus_xp = SPOTTER_XP
+            apply_xp(db, player_id, SPOTTER_XP, catch_id, ["spotter_award"])
+            # Log spotted event
+            db.table("spotted_events").insert({
+                "catch_id":      catch_id,
+                "plate_hash_id": plate_match["hash_id"],
+                "spotter_id":    player_id,
+                "owner_id":      plate_match["owner_id"],
+                "xp_awarded":    SPOTTER_XP,
+            }).execute()
+            spotter_username = _get_username(db, player_id)
+            notify_spotter_award(db, player_id, SPOTTER_XP)
+            notify_spotted(db, plate_match["owner_id"], spotter_username, body.fuzzy_city)
+
     # First finder
     first_finder_awarded = None
     if body.generation_id:
@@ -202,12 +225,13 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
 
     return {
         "catch_id": catch_id,
-        "xp_earned": xp_earned,
+        "xp_earned": xp_earned + spotter_bonus_xp,
         "new_total_xp": new_total_xp,
         "new_level": new_level,
         "level_up": level_up,
         "road_king_claimed": road_king_claimed,
         "first_finder_awarded": first_finder_awarded,
+        "spotter_bonus_xp": spotter_bonus_xp,
         "orbital_boost_active": orbital_boost > 1.0,
         "orbital_boost_remaining_min": boost_remaining,
         "duplicate": False,
@@ -322,6 +346,22 @@ def _get_username(db, player_id: str) -> str:
     result = db.table("players").select("username") \
         .eq("id", player_id).maybe_single().execute()
     return (result.data.get("username") or "Someone") if result.data else "Someone"
+
+
+def _check_plate_hash(db, vehicle_hash: str, catcher_id: str) -> Optional[dict]:
+    """
+    Returns {"hash_id": ..., "owner_id": ...} if the vehicle_hash matches
+    an opted-in plate hash that isn't owned by the catcher themselves.
+    """
+    result = db.table("plate_hashes").select("id, player_id") \
+        .eq("plate_hash", vehicle_hash.lower()) \
+        .neq("player_id", catcher_id) \
+        .limit(1) \
+        .execute()
+    if not result.data:
+        return None
+    row = result.data[0]
+    return {"hash_id": row["id"], "owner_id": row["player_id"]}
 
 
 def _get_vehicle_name(db, generation_id: str) -> str:

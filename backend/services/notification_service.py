@@ -84,6 +84,27 @@ def notify_first_finder(db, player_id: str, badge_name: str, vehicle_name: str):
     )
 
 
+def notify_spotted(db, owner_id: str, spotter_username: str, city: str | None):
+    """Tell a plate owner their car was spotted."""
+    where = f" in {city}" if city else ""
+    _send(
+        db, owner_id,
+        title="Your car was spotted!",
+        body=f"{spotter_username} caught your vehicle{where}.",
+        data={"type": "plate_spotted"},
+    )
+
+
+def notify_spotter_award(db, spotter_id: str, xp: int):
+    """Tell the catcher they earned a Spotter bonus."""
+    _send(
+        db, spotter_id,
+        title="Spotter Award!",
+        body=f"You caught a registered plate. +{xp} bonus XP.",
+        data={"type": "spotter_award", "xp": xp},
+    )
+
+
 def notify_orbital_boost_expiring(db, player_id: str, remaining_min: int):
     """Warn when boost is about to expire (5 min left)."""
     _send(

@@ -7,6 +7,8 @@ import { router } from 'expo-router';
 import { useLocation } from '@/hooks/useLocation';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { PrivacyShield } from '@/components/PrivacyShield';
 import {
   VehicleClassifier,
   VehicleClassifierStub,
@@ -35,6 +37,7 @@ export default function HighwayMode() {
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
+  const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
 
   const isMoving       = speedMph > SPEED_THRESHOLD_MPH;
   const lastFrameTime  = useSharedValue(0);
@@ -106,6 +109,9 @@ export default function HighwayMode() {
       <View style={styles.safetyBanner}>
         <Text style={styles.safetyText}>KEEP EYES ON ROAD</Text>
       </View>
+
+      {/* Privacy Shield */}
+      <PrivacyShield enabled={privacyShieldEnabled} />
 
       {/* Orbital Boost indicator */}
       {boostActive && (

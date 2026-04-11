@@ -23,7 +23,8 @@ async function request(method: string, path: string, body?: unknown) {
 }
 
 export const apiClient = {
-  get:    (path: string)               => request('GET',    path),
-  post:   (path: string, body: unknown) => request('POST',  path, body),
-  patch:  (path: string, body: unknown) => request('PATCH', path, body),
+  get:    (path: string)                => request('GET',    path),
+  post:   (path: string, body: unknown) => request('POST',   path, body),
+  patch:  (path: string, body: unknown) => request('PATCH',  path, body),
+  delete: (path: string)                => request('DELETE', path),
 };

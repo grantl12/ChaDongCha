@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
+from pydantic import BaseModel
+from typing import Optional
 from db import get_client
 
 router = APIRouter()
@@ -74,3 +76,81 @@ async def player_stats(player_id: str):
         "road_king_count": road_king_count,
         "first_finder_badges": badges,
     }
+
+
+# ─── Plate hash opt-in ────────────────────────────────────────────────────────
+
+class PlateHashRequest(BaseModel):
+    plate_hash: str          # SHA-256 hex, computed on-device
+    label: Optional[str] = None   # "My daily driver", etc.
+
+
+def _resolve_player(db, authorization: str) -> str:
+    """Resolve JWT → player_id, raise 401 on failure."""
+    token = authorization.replace("Bearer ", "")
+    try:
+        result = db.auth.get_user(token)
+        if not result or not result.user:
+            raise ValueError()
+        return result.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@router.post("/plate-hashes")
+async def register_plate_hash(body: PlateHashRequest, authorization: str = Header(...)):
+    """
+    Register a SHA-256 hash of your own license plate.
+    The raw plate is hashed on-device and never sent to the server.
+    When another player's ALPR captures a matching hash, they earn a Spotter award.
+    """
+    if len(body.plate_hash) != 64:
+        raise HTTPException(status_code=400, detail="plate_hash must be a 64-char SHA-256 hex string")
+
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+
+    try:
+        result = db.table("plate_hashes").insert({
+            "player_id":  player_id,
+            "plate_hash": body.plate_hash.lower(),
+            "label":      body.label,
+        }).execute()
+    except Exception as e:
+        if "unique" in str(e).lower():
+            raise HTTPException(status_code=409, detail="This plate hash is already registered")
+        raise HTTPException(status_code=500, detail="Could not register plate hash")
+
+    return {"id": result.data[0]["id"], "label": body.label}
+
+
+@router.get("/plate-hashes")
+async def list_plate_hashes(authorization: str = Header(...)):
+    """List the calling player's registered plate hashes (hash is masked)."""
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+
+    result = db.table("plate_hashes") \
+        .select("id, label, created_at") \
+        .eq("player_id", player_id) \
+        .order("created_at", desc=True) \
+        .execute()
+
+    return result.data or []
+
+
+@router.delete("/plate-hashes/{hash_id}")
+async def delete_plate_hash(hash_id: str, authorization: str = Header(...)):
+    """Remove a registered plate hash."""
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+
+    result = db.table("plate_hashes") \
+        .delete() \
+        .eq("id", hash_id) \
+        .eq("player_id", player_id) \
+        .execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Plate hash not found")
+    return {"ok": True}
