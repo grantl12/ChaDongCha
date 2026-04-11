@@ -1,31 +1,159 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useCatchStore } from '@/stores/catchStore';
 import { apiClient } from '@/api/client';
 
-const XP_PER_LEVEL = 1000;
+// ─── Level math (mirrors backend _level_for_xp) ────────────────────────────
+// Bands: [level, xpMin, xpMax | null]
+const LEVEL_BANDS = [
+  { level: 1,  xpMin: 0,       xpMax: 2001 },
+  { level: 6,  xpMin: 2001,    xpMax: 10001 },
+  { level: 11, xpMin: 10001,   xpMax: 50001 },
+  { level: 21, xpMin: 50001,   xpMax: 200001 },
+  { level: 36, xpMin: 200001,  xpMax: 1000001 },
+  { level: 51, xpMin: 1000001, xpMax: null },
+] as const;
+
+function levelProgress(xp: number): { progress: number; xpInBand: number; bandSize: number; nextLevel: number } {
+  for (let i = 0; i < LEVEL_BANDS.length; i++) {
+    const band = LEVEL_BANDS[i];
+    const next = LEVEL_BANDS[i + 1];
+    if (!next || xp < next.xpMin) {
+      const xpInBand  = xp - band.xpMin;
+      const bandSize  = band.xpMax ? band.xpMax - band.xpMin : 0;
+      const progress  = bandSize > 0 ? Math.min(xpInBand / bandSize, 1) : 1;
+      const nextLevel = next?.level ?? band.level;
+      return { progress, xpInBand, bandSize, nextLevel };
+    }
+  }
+  return { progress: 1, xpInBand: 0, bandSize: 0, nextLevel: 51 };
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+type PlayerStats = {
+  total_catches: number;
+  catches_by_rarity: Record<string, number>;
+  road_king_count: number;
+  first_finder_badges: {
+    badge_name: string;
+    region_scope: string;
+    region_value: string;
+    awarded_at: string;
+    vehicle_name: string;
+  }[];
+};
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+const RARITY_ORDER   = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+const RARITY_COLOR: Record<string, string> = {
+  common:    '#333',
+  uncommon:  '#4a9eff',
+  rare:      '#a855f7',
+  epic:      '#f59e0b',
+  legendary: '#e63946',
+};
+const RARITY_LABEL: Record<string, string> = {
+  common:    'COM',
+  uncommon:  'UNC',
+  rare:      'RARE',
+  epic:      'EPIC',
+  legendary: 'LEG',
+};
+const BADGE_EMOJI: Record<string, string> = {
+  'City Pioneer':       '🏙',
+  'National Spotter':   '🗺',
+  'Continental Hunter': '🌎',
+  'Global Elite':       '🌐',
+  'World First':        '★',
+};
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function BoostBanner({ expires }: { expires: string | null }) {
+  if (!expires) return null;
+  const remaining = Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
+  if (remaining <= 0) return null;
+  return (
+    <View style={styles.boostBanner}>
+      <Text style={styles.boostIcon}>⚡</Text>
+      <View>
+        <Text style={styles.boostTitle}>ORBITAL BOOST ACTIVE</Text>
+        <Text style={styles.boostSub}>{remaining}m remaining · XP multiplier on all catches</Text>
+      </View>
+    </View>
+  );
+}
+
+function RarityBar({ byRarity, total }: { byRarity: Record<string, number>; total: number }) {
+  if (total === 0) return null;
+  return (
+    <View style={styles.raritySection}>
+      {/* Stacked bar */}
+      <View style={styles.rarityBar}>
+        {RARITY_ORDER.map(r => {
+          const count = byRarity[r] ?? 0;
+          const pct   = (count / total) * 100;
+          if (pct === 0) return null;
+          return (
+            <View
+              key={r}
+              style={[styles.raritySegment, { flex: pct, backgroundColor: RARITY_COLOR[r] }]}
+            />
+          );
+        })}
+      </View>
+      {/* Legend */}
+      <View style={styles.rarityLegend}>
+        {RARITY_ORDER.map(r => {
+          const count = byRarity[r] ?? 0;
+          if (count === 0) return null;
+          return (
+            <View key={r} style={styles.rarityLegendItem}>
+              <View style={[styles.rarityDot, { backgroundColor: RARITY_COLOR[r] }]} />
+              <Text style={styles.rarityLegendText}>
+                {RARITY_LABEL[r]} {count}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { xp, level, username, userId, clearSession, setPlayer, setProfile, accessToken } = usePlayerStore();
-  const catchCount = useCatchStore(s => s.catches.length);
+  const {
+    xp, level, username, userId,
+    clearSession, setPlayer, setProfile,
+    accessToken, orbitalBoostExpires,
+  } = usePlayerStore();
 
-  // Re-sync profile from server each time this tab is focused
+  // Re-sync from server each focus
   useFocusEffect(useCallback(() => {
-    if (!accessToken) return;
+    if (!accessToken || !userId) return;
     apiClient.get('/auth/me')
       .then((profile: any) => {
-        if (userId) setPlayer({ userId, username: profile.username, accessToken });
+        setPlayer({ userId, username: profile.username, accessToken });
         setProfile(profile.xp, profile.level);
       })
-      .catch(() => { /* keep cached values on failure */ });
-  }, [accessToken]));
+      .catch(() => {});
+  }, [accessToken, userId]));
 
-  const xpIntoLevel  = xp % XP_PER_LEVEL;
-  const xpProgress   = xpIntoLevel / XP_PER_LEVEL;
-  const xpToNextLevel = XP_PER_LEVEL - xpIntoLevel;
+  const { data: stats, isLoading: statsLoading } = useQuery<PlayerStats>({
+    queryKey: ['player-stats', userId],
+    queryFn:  () => apiClient.get(`/players/${userId}/stats`) as Promise<PlayerStats>,
+    enabled:  !!userId,
+    staleTime: 60_000,
+  });
+
+  const { progress, xpInBand, bandSize, nextLevel } = levelProgress(xp);
+  const xpToNext = bandSize > 0 ? bandSize - xpInBand : 0;
+  const atMaxLevel = level >= 51;
 
   function handleSignOut() {
     clearSession();
@@ -33,69 +161,152 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Identity block */}
+      <View style={styles.identityBlock}>
         <Text style={styles.username}>{username ?? 'Driver'}</Text>
-        <Text style={styles.level}>LEVEL {level}</Text>
+        <Text style={styles.levelLabel}>LEVEL {level}</Text>
 
-        {/* XP bar */}
+        {/* XP progress */}
         <View style={styles.xpRow}>
-          <Text style={styles.xpLabel}>{xp.toLocaleString()} XP</Text>
-          <Text style={styles.xpNext}>{xpToNextLevel} to next level</Text>
+          <Text style={styles.xpCurrent}>{xp.toLocaleString()} XP</Text>
+          {!atMaxLevel && (
+            <Text style={styles.xpNext}>{xpToNext.toLocaleString()} to LV {nextLevel}</Text>
+          )}
         </View>
         <View style={styles.barTrack}>
-          <View style={[styles.barFill, { width: `${Math.round(xpProgress * 100)}%` }]} />
-        </View>
-
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{catchCount}</Text>
-            <Text style={styles.statLabel}>CAUGHT</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{level}</Text>
-            <Text style={styles.statLabel}>LEVEL</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{xp.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>XP</Text>
-          </View>
+          <View style={[styles.barFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
       </View>
 
+      {/* Orbital Boost */}
+      <BoostBanner expires={orbitalBoostExpires} />
+
+      {/* Key stats */}
+      <View style={styles.statsRow}>
+        <StatCell
+          value={statsLoading ? '—' : String(stats?.total_catches ?? 0)}
+          label="CAUGHT"
+          accent="#fff"
+        />
+        <View style={styles.statDivider} />
+        <StatCell
+          value={statsLoading ? '—' : String(stats?.road_king_count ?? 0)}
+          label="ROAD KING"
+          accent="#e63946"
+        />
+        <View style={styles.statDivider} />
+        <StatCell
+          value={xp.toLocaleString()}
+          label="TOTAL XP"
+        />
+      </View>
+
+      {/* Collection rarity breakdown */}
+      {!statsLoading && stats && stats.total_catches > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>COLLECTION</Text>
+          <RarityBar byRarity={stats.catches_by_rarity} total={stats.total_catches} />
+        </View>
+      )}
+
+      {/* First finder badges */}
+      {!statsLoading && stats && stats.first_finder_badges.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>FIRST FINDER BADGES</Text>
+          {stats.first_finder_badges.map((b, i) => (
+            <View key={i} style={styles.badgeRow}>
+              <Text style={styles.badgeEmoji}>{BADGE_EMOJI[b.badge_name] ?? '★'}</Text>
+              <View style={styles.badgeBody}>
+                <Text style={styles.badgeName}>{b.badge_name}</Text>
+                <Text style={styles.badgeVehicle}>{b.vehicle_name}</Text>
+              </View>
+              <Text style={styles.badgeRegion}>{b.region_value}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Empty badges hint */}
+      {!statsLoading && stats && stats.first_finder_badges.length === 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>FIRST FINDER BADGES</Text>
+          <Text style={styles.emptyHint}>Catch a rare vehicle before anyone else to earn badges.</Text>
+        </View>
+      )}
+
+      {/* Actions */}
       <View style={styles.actions}>
-        <Pressable style={styles.leaderboardButton} onPress={() => router.push('/leaderboard')}>
-          <Text style={styles.leaderboardText}>LEADERBOARD</Text>
+        <Pressable style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
+          <Text style={styles.actionText}>LEADERBOARD</Text>
         </Pressable>
-        <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+        <Pressable style={[styles.actionButton, styles.signOutButton]} onPress={handleSignOut}>
           <Text style={styles.signOutText}>SIGN OUT</Text>
         </Pressable>
       </View>
+    </ScrollView>
+  );
+}
+
+function StatCell({ value, label, accent }: { value: string; label: string; accent?: string }) {
+  return (
+    <View style={styles.statCell}>
+      <Text style={[styles.statValue, accent ? { color: accent } : null]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#0a0a0a', padding: 24, justifyContent: 'space-between', paddingTop: 80, paddingBottom: 40 },
-  card:           { backgroundColor: '#111', borderRadius: 16, padding: 24, gap: 8 },
-  username:       { color: '#fff', fontSize: 28, fontWeight: '900' },
-  level:          { color: '#e63946', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
-  xpRow:          { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  xpLabel:        { color: '#888', fontSize: 13 },
-  xpNext:         { color: '#444', fontSize: 13 },
-  barTrack:       { height: 4, backgroundColor: '#222', borderRadius: 2, overflow: 'hidden' },
-  barFill:        { height: 4, backgroundColor: '#e63946', borderRadius: 2 },
-  statsRow:       { flexDirection: 'row', marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
-  stat:           { flex: 1, alignItems: 'center' },
-  statValue:      { color: '#fff', fontSize: 22, fontWeight: '800' },
-  statLabel:      { color: '#555', fontSize: 11, letterSpacing: 2, marginTop: 2 },
-  statDivider:    { width: 1, backgroundColor: '#1a1a1a' },
-  actions:          { gap: 10 },
-  leaderboardButton:{ backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
-  leaderboardText:  { color: '#fff', fontSize: 13, letterSpacing: 2, fontWeight: '700' },
-  signOutButton:    { borderWidth: 1, borderColor: '#222', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
-  signOutText:      { color: '#555', fontSize: 13, letterSpacing: 2, fontWeight: '700' },
+  container:         { flex: 1, backgroundColor: '#0a0a0a' },
+  content:           { padding: 24, paddingTop: 72, paddingBottom: 48, gap: 24 },
+
+  identityBlock:     { gap: 6 },
+  username:          { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
+  levelLabel:        { color: '#e63946', fontSize: 12, fontWeight: '800', letterSpacing: 3 },
+  xpRow:             { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  xpCurrent:         { color: '#888', fontSize: 13 },
+  xpNext:            { color: '#333', fontSize: 13 },
+  barTrack:          { height: 3, backgroundColor: '#1a1a1a', borderRadius: 2, overflow: 'hidden' },
+  barFill:           { height: 3, backgroundColor: '#e63946', borderRadius: 2 },
+
+  boostBanner:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  boostIcon:         { fontSize: 20 },
+  boostTitle:        { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+  boostSub:          { color: '#f59e0b66', fontSize: 11, marginTop: 2 },
+
+  statsRow:          { flexDirection: 'row', backgroundColor: '#111', borderRadius: 12, paddingVertical: 20 },
+  statCell:          { flex: 1, alignItems: 'center', gap: 4 },
+  statValue:         { color: '#fff', fontSize: 24, fontWeight: '900' },
+  statLabel:         { color: '#444', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  statDivider:       { width: 1, backgroundColor: '#1a1a1a', marginVertical: 4 },
+
+  section:           { gap: 12 },
+  sectionTitle:      { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3 },
+  emptyHint:         { color: '#2a2a2a', fontSize: 13, fontStyle: 'italic' },
+
+  raritySection:     { gap: 10 },
+  rarityBar:         { height: 6, flexDirection: 'row', borderRadius: 3, overflow: 'hidden', gap: 1 },
+  raritySegment:     { borderRadius: 2 },
+  rarityLegend:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  rarityLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  rarityDot:         { width: 6, height: 6, borderRadius: 3 },
+  rarityLegendText:  { color: '#555', fontSize: 11, fontWeight: '600' },
+
+  badgeRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111', gap: 12 },
+  badgeEmoji:        { fontSize: 20, width: 28, textAlign: 'center' },
+  badgeBody:         { flex: 1, gap: 2 },
+  badgeName:         { color: '#fff', fontSize: 14, fontWeight: '700' },
+  badgeVehicle:      { color: '#555', fontSize: 12 },
+  badgeRegion:       { color: '#333', fontSize: 11 },
+
+  actions:           { gap: 10, marginTop: 8 },
+  actionButton:      { backgroundColor: '#111', borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  signOutButton:     { backgroundColor: 'transparent', borderColor: '#1a1a1a' },
+  actionText:        { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
+  signOutText:       { color: '#333', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
 });
