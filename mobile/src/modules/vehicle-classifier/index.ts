@@ -187,11 +187,7 @@ function weightedRandom(): StubVehicle {
 }
 
 export const VehicleClassifierStub: IVehicleClassifier = {
-  triggerDetect(_frame) {
-    return Math.random() < 0.3;  // ~30% trigger rate
-  },
-
-  classify(_frame) {
+  async classify(_imagePath) {
     if (Math.random() < 0.1) return null;  // ~10% miss rate
 
     const v          = weightedRandom();
@@ -208,8 +204,6 @@ export const VehicleClassifierStub: IVehicleClassifier = {
       boundingBox: { x: 0.1, y: 0.2, width: 0.6, height: 0.5 },
     };
   },
-
-  async loadModel(_path) { return true; },
 
   modelVersion() { return 'stub-0.0.1'; },
 };

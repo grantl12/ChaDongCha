@@ -127,7 +127,7 @@ def seed_city(db, city: str, density: float, dry_run: bool):
     #   (higher-level ghosts get more roads)
     total_lvl = sum(p["level"] for p in ghost_players)
     weights   = [p["level"] / total_lvl for p in ghost_players]
-    assigned  = {p["id"]: [] for p in ghost_players}
+    assigned: dict[str, list] = {p["id"]: [] for p in ghost_players}
     for seg in chosen:
         owner = rng.choices(ghost_players, weights=weights, k=1)[0]
         assigned[owner["id"]].append(seg["id"])

@@ -21,7 +21,7 @@ async def player_stats(player_id: str):
     # Verify player exists
     player = db.table("players").select("id, username, xp, level") \
         .eq("id", player_id).maybe_single().execute()
-    if not player.data:
+    if player is None or not player.data:
         raise HTTPException(status_code=404, detail="Player not found")
 
     # Catches grouped by rarity via generations join

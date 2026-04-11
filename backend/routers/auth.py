@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
-from typing import Optional
 from db import get_client
 
 router = APIRouter()
