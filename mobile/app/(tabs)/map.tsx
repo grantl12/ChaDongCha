@@ -201,11 +201,26 @@ export default function MapScreen() {
             )}
           </View>
 
-          {selected.segment.king_id && (
-            <Text style={styles.sheetScans}>
-              {selected.segment.king_scan_count} scans in 30 days
-            </Text>
-          )}
+          {selected.segment.king_id && (() => {
+            const kingCount = selected.segment.king_scan_count ?? 0;
+            const myCount   = selected.challengers?.find(
+              c => (c as any).player_id === userId
+            )?.scan_count_30d ?? 0;
+            const isKing    = selected.segment.king_id === userId;
+            const needed    = isKing ? null : Math.max(0, kingCount - myCount + 1);
+            return (
+              <View style={{ gap: 4 }}>
+                <Text style={styles.sheetScans}>{kingCount} scans in 30 days</Text>
+                {!isKing && needed !== null && (
+                  <Text style={styles.sheetClaim}>
+                    {needed === 0
+                      ? '🔥 You can claim this road — go drive it!'
+                      : `${needed} more scan${needed === 1 ? '' : 's'} to claim`}
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
 
           {selected.challengers?.length > 0 && (
             <>
@@ -245,6 +260,7 @@ const styles = StyleSheet.create({
   sheetKingName:         { color: '#e63946', fontSize: 15, fontWeight: '700' },
   sheetYouBadge:         { backgroundColor: '#e6394622', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   sheetScans:            { color: '#444', fontSize: 12 },
+  sheetClaim:            { color: '#e63946', fontSize: 12, fontWeight: '600' },
   sheetChallengersLabel: { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginTop: 8 },
   challengerRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   challengerRank:        { color: '#333', fontSize: 13, fontWeight: '700', width: 20 },

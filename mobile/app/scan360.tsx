@@ -26,7 +26,7 @@ type Anchor = typeof ANCHORS[number];
 export default function Scan360Screen() {
   const device = useCameraDevice('back');
   const { addCatch } = useCatchStore();
-  const { fuzzyCity } = useLocation();
+  const { fuzzyCity, fuzzyDistrict } = useLocation();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostMins = boostRemainingMin(orbitalBoostExpires);
   const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
@@ -58,7 +58,7 @@ export default function Scan360Screen() {
 
   const handleConfirm = useCallback(() => {
     if (!result) return;
-    addCatch({ ...result, catchType: 'scan360', fuzzyCity: fuzzyCity ?? undefined });
+    addCatch({ ...result, catchType: 'scan360', fuzzyCity: fuzzyCity ?? undefined, fuzzyDistrict: fuzzyDistrict ?? undefined });
     router.back();
   }, [result, addCatch]);
 

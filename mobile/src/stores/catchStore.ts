@@ -17,6 +17,7 @@ export type CatchRecord = {
   confidence: number;
   catchType: 'highway' | 'scan360' | 'space' | 'unknown';
   fuzzyCity?: string;
+  fuzzyDistrict?: string;
   caughtAt: string;
   synced: boolean;
   xpEarned?: number;             // set after successful backend sync
@@ -102,8 +103,9 @@ export const useCatchStore = create<CatchStore>()(
               color:         catch_.color,
               body_style:    catch_.bodyStyle,
               confidence:    catch_.confidence,
-              fuzzy_city:    catch_.fuzzyCity ?? null,
-              caught_at:     catch_.caughtAt,
+              fuzzy_city:     catch_.fuzzyCity ?? null,
+              fuzzy_district: catch_.fuzzyDistrict ?? null,
+              caught_at:      catch_.caughtAt,
             }) as CatchResponse;
 
             // Apply XP — use server-authoritative level

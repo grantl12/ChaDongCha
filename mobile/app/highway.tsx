@@ -33,7 +33,7 @@ function boostRemainingMin(expires: string | null): number {
 
 export default function HighwayMode() {
   const device = useCameraDevice('back');
-  const { speedMph, fuzzyCity } = useLocation();
+  const { speedMph, fuzzyCity, fuzzyDistrict } = useLocation();
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
@@ -72,7 +72,7 @@ export default function HighwayMode() {
 
   const handleCatch = useCallback((result: ClassifyResult) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addCatch({ ...result, catchType: 'highway', fuzzyCity: fuzzyCity ?? undefined });
+    addCatch({ ...result, catchType: 'highway', fuzzyCity: fuzzyCity ?? undefined, fuzzyDistrict: fuzzyDistrict ?? undefined });
     showBanner(`CAUGHT: ${result.make} ${result.model} · ${Math.round(result.confidence * 100)}%`);
   }, [addCatch]);
 

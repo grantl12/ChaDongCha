@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useLocation } from '@/hooks/useLocation';
 
 type LeaderboardEntry = {
   id: string;
@@ -26,8 +27,8 @@ function RankBadge({ rank }: { rank: number }) {
 
 export default function LeaderboardScreen() {
   const [tab, setTab] = useState<Tab>('global');
-  const userId   = usePlayerStore(s => s.userId);
-  const fuzzyCity = ''; // placeholder — wire to useLocation().fuzzyCity once available
+  const userId    = usePlayerStore(s => s.userId);
+  const { fuzzyCity } = useLocation();
 
   const globalQ = useQuery<LeaderboardEntry[]>({
     queryKey: ['leaderboard-global'],
