@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { useCatchStore, CatchRecord } from '@/stores/catchStore';
+import { GarageCarousel } from '@/components/GarageCarousel';
 
 const RARITY_COLOR: Record<string, string> = {
   common:    '#2a2a2a',
@@ -91,8 +93,11 @@ function CatchCard({ item }: { item: CatchRecord }) {
   );
 }
 
+type ViewMode = 'grid' | '3d';
+
 export default function GarageScreen() {
   const catches = useCatchStore(s => s.catches);
+  const [viewMode, setViewMode] = useState<ViewMode>('3d');
 
   if (catches.length === 0) {
     return (
@@ -107,26 +112,53 @@ export default function GarageScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>GARAGE</Text>
-        <Text style={styles.count}>{catches.length} caught</Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.count}>{catches.length} caught</Text>
+          <View style={styles.viewToggle}>
+            <Pressable
+              style={[styles.toggleBtn, viewMode === '3d' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('3d')}
+            >
+              <Text style={[styles.toggleText, viewMode === '3d' && styles.toggleTextActive]}>3D</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.toggleBtn, viewMode === 'grid' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('grid')}
+            >
+              <Text style={[styles.toggleText, viewMode === 'grid' && styles.toggleTextActive]}>GRID</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
-      <FlatList
-        data={catches}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        renderItem={({ item }) => <CatchCard item={item} />}
-        contentContainerStyle={styles.grid}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-      />
+
+      {viewMode === '3d' ? (
+        <GarageCarousel catches={catches} />
+      ) : (
+        <FlatList
+          data={catches}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          renderItem={({ item }) => <CatchCard item={item} />}
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#0a0a0a' },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 16, paddingTop: 60, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 60, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
   title:        { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 3 },
+  headerRight:  { alignItems: 'flex-end', gap: 8 },
   count:        { color: '#555', fontSize: 13 },
+  viewToggle:   { flexDirection: 'row', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, overflow: 'hidden' },
+  toggleBtn:    { paddingHorizontal: 10, paddingVertical: 5 },
+  toggleBtnActive: { backgroundColor: '#1a1a1a' },
+  toggleText:   { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  toggleTextActive: { color: '#fff' },
   grid:         { padding: 12, paddingBottom: 40 },
   row:          { gap: 10, marginBottom: 10 },
   card:         { flex: 1, borderRadius: 12, borderWidth: 1, padding: 14, gap: 8, minHeight: 160 },

@@ -77,15 +77,22 @@ function withModelXcodeResources(config) {
   return withXcodeProject(config, (config) => {
     const xcodeProject = config.modResults;
     const projectName  = config.modRequest.projectName;
+    const target       = xcodeProject.getFirstTarget().uuid;
+
+    // Find the main project group key so addResourceFile doesn't fall back
+    // to the non-existent 'Resources' group and crash on null.path
+    const groupKey = xcodeProject.findPBXGroupKey({ name: projectName });
 
     ['vehicle_classifier.mlpackage', 'class_map.json'].forEach((file) => {
-      // Avoid duplicate entries
-      const exists = xcodeProject
-        .pbxGroupByName(projectName)
-        ?.children?.some((c) => c.comment === file);
+      // Skip if already registered
+      const group = groupKey ? xcodeProject.getPBXGroupByKey(groupKey) : null;
+      const exists = group?.children?.some((c) => c.comment === file);
+      if (exists) return;
 
-      if (!exists) {
-        xcodeProject.addResourceFile(file, { target: xcodeProject.getFirstTarget().uuid });
+      try {
+        xcodeProject.addResourceFile(file, { target }, groupKey);
+      } catch (e) {
+        console.warn(`[withVehicleClassifier] Could not add ${file} to Xcode project: ${e.message}`);
       }
     });
 
