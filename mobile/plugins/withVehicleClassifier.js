@@ -56,15 +56,19 @@ function withModelAssets(config) {
 
 function withVehicleClassifierPod(config) {
   return withPodfile(config, (config) => {
-    const podfile = config.modResults;
+    // In @expo/config-plugins >=9, modResults is { path, contents, language },
+    // not a raw string. Access .contents and write it back into the object.
     const podLine = "  pod 'VehicleClassifier', :path => '../modules/vehicle-classifier'";
+    const { contents } = config.modResults;
 
-    if (!podfile.includes(podLine)) {
-      // Insert after the `use_expo_modules!` line
-      config.modResults = podfile.replace(
-        'use_expo_modules!',
-        `use_expo_modules!\n${podLine}`,
-      );
+    if (!contents.includes(podLine)) {
+      config.modResults = {
+        ...config.modResults,
+        contents: contents.replace(
+          'use_expo_modules!',
+          `use_expo_modules!\n${podLine}`,
+        ),
+      };
     }
 
     return config;
@@ -90,7 +94,13 @@ function withModelXcodeResources(config) {
       if (exists) return;
 
       try {
-        xcodeProject.addResourceFile(file, { target }, groupKey);
+        // Only pass groupKey when it is non-null — passing null causes xcode-js
+        // to crash trying to read group.path.
+        if (groupKey) {
+          xcodeProject.addResourceFile(file, { target }, groupKey);
+        } else {
+          xcodeProject.addResourceFile(file, { target });
+        }
       } catch (e) {
         console.warn(`[withVehicleClassifier] Could not add ${file} to Xcode project: ${e.message}`);
       }
