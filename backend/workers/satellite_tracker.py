@@ -28,24 +28,53 @@ CELESTRAK_GROUPS = {
 }
 
 PASS_WINDOW_HOURS   = 12       # how far ahead to predict passes
-MIN_ELEVATION_DEG   = 60       # minimum elevation to be "catchable"
+MIN_ELEVATION_DEG   = 10       # minimum elevation to be "catchable" (above horizon)
 STEP_SECONDS        = 30       # SGP4 propagation step size
 NOTIFY_BEFORE_SECS  = 300      # 5 min advance push notification
+NOTIFY_RADIUS_KM    = 600      # notify players whose home city is within this radius
 
 # Major cities used as proxy observer locations until live player GPS is used
 # (lat, lon, city_name)
 SEED_LOCATIONS: list[tuple[float, float, str]] = [
+    # East Asia
     (37.5665,  126.9780, "Seoul"),
     (35.6762,  139.6503, "Tokyo"),
+    # North America
     (34.0522, -118.2437, "Los Angeles"),
     (40.7128,  -74.0060, "New York"),
     (41.8781,  -87.6298, "Chicago"),
+    (33.7490,  -84.3880, "Atlanta"),    # SE US — covers Georgia, Alabama, Carolinas
+    (29.7604,  -95.3698, "Houston"),    # US South / Gulf Coast / Texas
+    # Europe
     (51.5074,   -0.1278, "London"),
     (48.8566,    2.3522, "Paris"),
     (52.5200,   13.4050, "Berlin"),
+    # South / Southeast Asia
+    (19.0760,   72.8777, "Mumbai"),     # South Asia — covers India subcontinent
     (1.3521,   103.8198, "Singapore"),
+    # Oceania
     (-33.8688, 151.2093, "Sydney"),
+    # Africa / Middle East
+    (30.0444,   31.2357, "Cairo"),      # covers N Africa & Middle East
+    # South America
+    (-23.5505,  -46.6333, "São Paulo"), # covers most of Brazil & Southern Cone
 ]
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in kilometres between two lat/lon points."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def _player_in_range(player: dict, region_lat: float, region_lon: float) -> bool:
+    """Return True if the player's GPS home location is within NOTIFY_RADIUS_KM of the pass region."""
+    if player.get("home_lat") is None or player.get("home_lon") is None:
+        return False
+    return _haversine_km(player["home_lat"], player["home_lon"], region_lat, region_lon) <= NOTIFY_RADIUS_KM
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +138,7 @@ def _elevation_deg(
 # TLE fetch & DB upsert
 # ---------------------------------------------------------------------------
 
-async def fetch_tles(group: str, url: str) -> list[tuple[str, str, str]]:
+async def fetch_tles(url: str) -> list[tuple[str, str, str]]:
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url)
         resp.raise_for_status()
@@ -125,7 +154,7 @@ async def refresh_tle_db() -> None:
     db = get_client()
     for group, url in CELESTRAK_GROUPS.items():
         try:
-            tles = await fetch_tles(group, url)
+            tles = await fetch_tles(url)
             log.info("Fetched %d TLEs for group '%s'", len(tles), group)
             for name, line1, line2 in tles:
                 norad_id = int(line1[2:7])
@@ -299,7 +328,7 @@ async def fire_notifications() -> None:
 
     upcoming = (
         db.table("catchable_objects")
-        .select("id, pass_start, max_elevation, space_objects(name, rarity_tier)")
+        .select("id, pass_start, max_elevation, region_lat, region_lon, space_objects(name, rarity_tier)")
         .eq("notified", False)
         .lte("pass_start", notify_cutoff)
         .gte("pass_end", now.isoformat())
@@ -308,23 +337,40 @@ async def fire_notifications() -> None:
     if not upcoming.data:
         return
 
-    # Collect player Expo push tokens (stored in players table — Phase 9 addition)
-    # For now, log and mark notified; token delivery wired when push tokens are stored.
-    token_rows = db.table("players").select("expo_push_token").not_.is_("expo_push_token", "null").execute()
-    tokens = [r["expo_push_token"] for r in (token_rows.data or [])]
+    # Fetch all players who have a push token and a home city for radius filtering.
+    player_rows = (
+        db.table("players")
+        .select("expo_push_token, home_lat, home_lon")
+        .not_.is_("expo_push_token", "null")
+        .not_.is_("home_lat", "null")
+        .execute()
+    )
+    players = player_rows.data or []
 
-    if tokens:
-        messages = []
-        for row in upcoming.data:
-            obj = row.get("space_objects") or {}
-            minutes = max(0, int((datetime.fromisoformat(row["pass_start"]).replace(tzinfo=timezone.utc) - now).total_seconds() // 60))
-            messages.append({
-                "to": tokens,
-                "title": f"{obj.get('name', 'Object')} overhead in {minutes}m",
-                "body": f"{round(row['max_elevation'])}° max elevation — point your phone at the sky!",
-                "data": {"type": "satellite_pass", "catchable_object_id": row["id"]},
-            })
+    messages = []
+    for row in upcoming.data:
+        region_lat = row["region_lat"]
+        region_lon = row["region_lon"]
+        nearby_tokens = [
+            p["expo_push_token"]
+            for p in players
+            if _player_in_range(p, region_lat, region_lon)
+        ]
+        if not nearby_tokens:
+            continue
 
+        obj = row.get("space_objects") or {}
+        minutes = max(0, int(
+            (datetime.fromisoformat(row["pass_start"]).replace(tzinfo=timezone.utc) - now).total_seconds() // 60
+        ))
+        messages.append({
+            "to": nearby_tokens,
+            "title": f"{obj.get('name', 'Object')} overhead in {minutes}m",
+            "body": f"{round(row['max_elevation'])}° max elevation — point your phone at the sky!",
+            "data": {"type": "satellite_pass", "catchable_object_id": row["id"]},
+        })
+
+    if messages:
         async with httpx.AsyncClient() as client:
             for msg in messages:
                 try:
@@ -336,7 +382,8 @@ async def fire_notifications() -> None:
     for oid in ids:
         db.table("catchable_objects").update({"notified": True}).eq("id", oid).execute()
 
-    log.info("Sent notifications for %d upcoming passes to %d devices", len(upcoming.data), len(tokens))
+    notified_combos = sum(len(m["to"]) for m in messages)
+    log.info("Sent notifications for %d upcoming passes (%d device/pass combos)", len(messages), notified_combos)
 
 
 # ---------------------------------------------------------------------------

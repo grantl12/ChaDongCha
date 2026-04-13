@@ -230,6 +230,68 @@ CLASS_QUERIES: dict[str, list[str]] = {
         "Bugatti Chiron 2017 2018 photo",
         "Chiron supercar real photo",
     ],
+    # ── Trucks (additional) ─────────────────────────────────────────────────
+    "Ram 1500 DT": [
+        "Ram 1500 DT 2019 exterior",
+        "Ram 1500 fifth generation 2019 2020 street",
+        "Ram 1500 2021 2022 side view pickup",
+        "Ram truck 2019 real photo",
+    ],
+    "Toyota Tacoma AN120": [
+        "Toyota Tacoma 2016 AN120 exterior",
+        "Tacoma third generation 2016 2017 street",
+        "Toyota Tacoma 2018 2019 side view pickup",
+        "Tacoma TRD 2020 2021 real photo",
+    ],
+    "Toyota Tundra XK70": [
+        "Toyota Tundra 2022 XK70 exterior",
+        "Tundra third generation 2022 street photo",
+        "Toyota Tundra 2022 2023 side view pickup",
+        "Tundra TRD Pro 2022 real photo",
+    ],
+    "Ford Ranger P703": [
+        "Ford Ranger P703 2019 exterior",
+        "Ford Ranger 2019 2020 midsize pickup street",
+        "Ranger P703 2021 2022 side view photo",
+        "Ford Ranger 2022 real photo",
+    ],
+    # ── Motorcycles ─────────────────────────────────────────────────────────
+    "Ducati Panigale V4": [
+        "Ducati Panigale V4 exterior side view",
+        "Panigale V4 superbike street photo",
+        "Ducati Panigale V4 2018 2019 real photo",
+        "Panigale V4S motorcycle photo",
+    ],
+    "Honda CBR1000RR-R": [
+        "Honda CBR1000RR-R Fireblade exterior",
+        "CBR1000RR 2020 2021 side view real photo",
+        "Honda CBR Fireblade superbike street photo",
+        "CBR1000RR-R SP motorcycle photo",
+    ],
+    "Kawasaki Ninja ZX-10R": [
+        "Kawasaki Ninja ZX-10R exterior side view",
+        "ZX10R superbike street photo real",
+        "Kawasaki ZX-10R 2021 2022 motorcycle photo",
+        "Ninja ZX-10R track street real photo",
+    ],
+    "Yamaha YZF-R1": [
+        "Yamaha YZF-R1 exterior side view",
+        "R1 superbike street photo real",
+        "Yamaha R1 2020 2021 motorcycle photo",
+        "YZF-R1M track real photo",
+    ],
+    "Harley-Davidson Sportster S": [
+        "Harley Davidson Sportster S RH1250S exterior",
+        "Sportster S 2021 2022 side view street photo",
+        "Harley Sportster S motorcycle real photo",
+        "RH1250S Harley Davidson 2022 photo",
+    ],
+    "BMW S1000RR K67": [
+        "BMW S1000RR K67 2019 exterior side view",
+        "S1000RR superbike street photo real",
+        "BMW S1000RR 2019 2020 2021 motorcycle photo",
+        "S1000RR M package real photo",
+    ],
 }
 
 

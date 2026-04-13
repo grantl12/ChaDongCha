@@ -77,6 +77,9 @@ create table if not exists players (
 
 -- push token for satellite pass notifications (added via migration 001 on existing DBs)
 alter table players add column if not exists expo_push_token text;
+-- device GPS coords set at onboarding — used for satellite pass notification radius
+alter table players add column if not exists home_lat float;
+alter table players add column if not exists home_lon float;
 -- opt-in training data contribution
 alter table players add column if not exists contribute_scans boolean not null default false;
 
