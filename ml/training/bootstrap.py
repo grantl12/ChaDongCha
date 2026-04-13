@@ -64,7 +64,7 @@ def phase_info():
         print(f"  {i:3d}  {cls}")
 
 
-def phase_classify(epochs: int):
+def phase_classify(epochs: int, resume: bool = False):
     try:
         import torch
         import torch.nn as nn
@@ -141,17 +141,32 @@ def phase_classify(epochs: int):
     print(f"Train   : {len(train_idx)} images")
     print(f"Val     : {len(val_idx)} images")
 
+    checkpoint_path = MODELS_DIR / "best.pt"
+    start_epoch = 1
+    best_acc    = 0.0
+
     model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=n_classes)
+
+    if resume and checkpoint_path.exists():
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        model.load_state_dict(ckpt["model_state"])
+        best_acc    = ckpt.get("val_acc", 0.0)
+        start_epoch = ckpt.get("epoch", 0) + 1
+        print(f"Resumed from epoch {start_epoch - 1}  (best val_acc={best_acc:.3f})")
+    elif resume:
+        print("No checkpoint found — starting from pretrained weights.")
+
     model = model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    # T_max covers the full remaining run so LR anneals smoothly to the end
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    best_acc = 0.0
+    total_epochs = start_epoch - 1 + epochs
 
-    for epoch in range(1, epochs + 1):
+    for epoch in range(start_epoch, total_epochs + 1):
         # ---- train ----
         model.train()
         running_loss = 0.0
@@ -177,7 +192,7 @@ def phase_classify(epochs: int):
         val_acc  = correct / total
         avg_loss = running_loss / len(train_loader)
         marker   = "  ✓ best" if val_acc > best_acc else ""
-        print(f"Epoch {epoch:3d}/{epochs}  loss={avg_loss:.4f}  val_acc={val_acc:.3f}{marker}")
+        print(f"Epoch {epoch:3d}/{total_epochs}  loss={avg_loss:.4f}  val_acc={val_acc:.3f}{marker}")
 
         if val_acc > best_acc:
             best_acc = val_acc
@@ -195,6 +210,7 @@ def phase_classify(epochs: int):
 
     print(f"\nTraining complete.  Best val acc: {best_acc:.3f}")
     print(f"Checkpoint: {MODELS_DIR / 'best.pt'}")
+    print(f"To keep training: python training/bootstrap.py --phase classify --epochs N --resume")
 
 
 def phase_export():
@@ -319,11 +335,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", choices=["info", "classify", "export"], required=True)
     parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--resume", action="store_true", help="Resume from best.pt checkpoint")
     args = parser.parse_args()
 
     if args.phase == "info":
         phase_info()
     elif args.phase == "classify":
-        phase_classify(args.epochs)
+        phase_classify(args.epochs, resume=args.resume)
     elif args.phase == "export":
         phase_export()
