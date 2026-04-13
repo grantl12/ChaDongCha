@@ -76,8 +76,26 @@ function AuthStep({ onSuccess }: { onSuccess: () => void }) {
     try {
       if (mode === 'signup') {
         if (!username) { setError('Username is required.'); setLoading(false); return; }
-        await apiClient.post('/auth/signup', { email, password, username });
-        setInfo('Account created! Check your email to confirm, then sign in.');
+        const signupRes = await apiClient.post('/auth/signup', { email, password, username }) as {
+          user_id: string;
+          access_token?: string;
+          refresh_token?: string;
+        };
+
+        if (signupRes.access_token) {
+          // Backend issued a session directly — auto sign-in, no email step.
+          setPlayer({ userId: signupRes.user_id, username, accessToken: signupRes.access_token });
+          try {
+            const profile = await apiClient.get('/auth/me') as { username: string; xp: number; level: number };
+            setPlayer({ userId: signupRes.user_id, username: profile.username, accessToken: signupRes.access_token });
+            setProfile(profile.xp, profile.level);
+          } catch { /* non-fatal — username already set from form */ }
+          onSuccess();
+          return;
+        }
+
+        // Fallback (shouldn't normally hit): manual sign-in
+        setInfo('Account created! Sign in to continue.');
         setMode('signin');
         setLoading(false);
         return;

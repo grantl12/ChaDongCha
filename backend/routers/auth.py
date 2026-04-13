@@ -19,9 +19,19 @@ class SignInRequest(BaseModel):
 @router.post("/signup")
 async def signup(body: SignUpRequest):
     db = get_client()
+
+    # Create a pre-confirmed user via the admin API — no verification email,
+    # no "check your inbox" friction. Service key required (already in use).
     try:
-        result = db.auth.sign_up({"email": body.email, "password": body.password})
+        result = db.auth.admin.create_user({
+            "email":         body.email,
+            "password":      body.password,
+            "email_confirm": True,
+        })
     except Exception as e:
+        detail = str(e).lower()
+        if "already" in detail or "exists" in detail or "registered" in detail:
+            raise HTTPException(status_code=409, detail="An account with that email already exists")
         raise HTTPException(status_code=400, detail=str(e))
 
     user_id = result.user.id if result.user else None
@@ -30,18 +40,26 @@ async def signup(body: SignUpRequest):
 
     try:
         db.table("players").upsert({
-            "id": user_id,
+            "id":       user_id,
             "username": body.username,
         }, on_conflict="id").execute()
-        # supabase-py may return empty data on a successful upsert depending on
-        # version/RLS config. Absence of exception means the write succeeded.
     except Exception as e:
         detail = str(e)
         if "username" in detail.lower():
             raise HTTPException(status_code=409, detail="Username already taken")
         raise HTTPException(status_code=500, detail="Could not create player profile")
 
-    return {"user_id": user_id, "message": "Check your email to confirm your account"}
+    # Immediately issue a session so the mobile client can skip the sign-in step.
+    try:
+        signin = db.auth.sign_in_with_password({"email": body.email, "password": body.password})
+        return {
+            "user_id":       user_id,
+            "access_token":  signin.session.access_token,
+            "refresh_token": signin.session.refresh_token,
+        }
+    except Exception:
+        # Fallback — client can sign in separately (shouldn't normally happen)
+        return {"user_id": user_id}
 
 
 @router.post("/signin")
