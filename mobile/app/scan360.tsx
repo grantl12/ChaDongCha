@@ -7,8 +7,12 @@ import { useCatchStore } from '@/stores/catchStore';
 import { VehicleClassifier, VehicleClassifierStub, type ClassifyResult } from '@/modules/vehicle-classifier';
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
+import { savePhotos } from '@/utils/savePhotos';
 
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
+
+/** Below this confidence the classifier result is discarded as unreliable. */
+const MIN_CONFIDENCE = 0.45;
 
 const ANCHORS = ['FRONT', 'PASSENGER', 'REAR', 'DRIVER'] as const;
 type Anchor = typeof ANCHORS[number];
@@ -27,36 +31,58 @@ export default function Scan360Screen() {
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostMins = boostRemainingMin(orbitalBoostExpires);
 
-  const [captured, setCaptured]         = useState<Set<Anchor>>(new Set());
+  const [captured, setCaptured]           = useState<Set<Anchor>>(new Set());
   const [currentAnchor, setCurrentAnchor] = useState<Anchor>('FRONT');
-  const [result, setResult]             = useState<ClassifyResult | null>(null);
-  const [classifying, setClassifying]   = useState(false);
+  const [result, setResult]               = useState<ClassifyResult | null>(null);
+  const [classifying, setClassifying]     = useState(false);
+  const [lowConfidence, setLowConfidence] = useState(false);
+
+  // All 4 temp photo paths, keyed by anchor index
+  const tempPhotos = useRef<(string | null)[]>([null, null, null, null]);
 
   const captureAnchor = useCallback(async () => {
+    const anchorIndex = ANCHORS.indexOf(currentAnchor);
+
+    // Take a photo at every anchor — these are the collector's artifact
+    const photo = await cameraRef.current?.takePhoto();
+    if (photo) {
+      tempPhotos.current[anchorIndex] = photo.path;
+    }
+
     const nextCaptured = new Set(captured);
     nextCaptured.add(currentAnchor);
     setCaptured(nextCaptured);
 
-    const nextIndex = ANCHORS.indexOf(currentAnchor) + 1;
+    const nextIndex = anchorIndex + 1;
 
     if (nextIndex < ANCHORS.length) {
       setCurrentAnchor(ANCHORS[nextIndex]);
     } else {
-      // All four anchors captured — classify using a photo
+      // All four anchors captured — classify using the FRONT photo (best angle for ID)
+      const classifyPath = tempPhotos.current[0] ?? photo?.path ?? null;
+      if (!classifyPath) {
+        setResult(null);
+        return;
+      }
+
       setClassifying(true);
+      setLowConfidence(false);
       try {
-        const photo = await cameraRef.current?.takePhoto();
         const CLASSIFY_TIMEOUT_MS = 15_000;
-        const classification = photo
-          ? await Promise.race([
-              Classifier.classify(photo.path),
-              new Promise<null>((_, reject) =>
-                setTimeout(() => reject(new Error('classify timeout')), CLASSIFY_TIMEOUT_MS)
-              ),
-            ])
-          : null;
-        setResult(classification as ClassifyResult | null);
-        if (classification) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const classification = await Promise.race([
+          Classifier.classify(classifyPath),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('classify timeout')), CLASSIFY_TIMEOUT_MS)
+          ),
+        ]);
+
+        if (classification && classification.confidence < MIN_CONFIDENCE) {
+          setLowConfidence(true);
+          setResult(null);
+        } else {
+          setResult(classification as ClassifyResult | null);
+          if (classification) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
       } catch {
         setResult(null);
       } finally {
@@ -65,14 +91,26 @@ export default function Scan360Screen() {
     }
   }, [captured, currentAnchor]);
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     if (!result) return;
+
+    // Generate the catch ID here so we can use it as the photo folder name
+    const catchId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    // Copy temp photos to permanent storage (non-blocking — addCatch is called after)
+    const photoPaths = await savePhotos(tempPhotos.current, catchId);
+
     addCatch({
       ...result,
-      catchType: 'scan360',
+      catchId,                  // pre-generated so photos are stored in the right dir
+      catchType:    'scan360',
       fuzzyCity:     fuzzyCity     ?? undefined,
       fuzzyDistrict: fuzzyDistrict ?? undefined,
+      photoPaths:    photoPaths.filter(Boolean),
+      // Community upload uses the FRONT photo (index 0) if contributeScans is on
+      photoPath:     tempPhotos.current[0] ?? undefined,
     });
+
     router.back();
   }, [result, addCatch, fuzzyCity, fuzzyDistrict]);
 
@@ -80,6 +118,8 @@ export default function Scan360Screen() {
     setCaptured(new Set());
     setCurrentAnchor('FRONT');
     setResult(null);
+    setLowConfidence(false);
+    tempPhotos.current = [null, null, null, null];
   }, []);
 
   if (!device) {
@@ -106,7 +146,7 @@ export default function Scan360Screen() {
         </View>
       )}
 
-      {/* Anchor progress dots */}
+      {/* Anchor progress pips */}
       <View style={styles.progressRow}>
         {ANCHORS.map(a => (
           <View
@@ -124,12 +164,19 @@ export default function Scan360Screen() {
 
       {!result && (
         <View style={styles.instruction}>
-          {classifying ? (
-            <ActivityIndicator color="#e63946" style={{ marginBottom: 8 }} />
-          ) : null}
+          {classifying && <ActivityIndicator color="#e63946" style={{ marginBottom: 8 }} />}
           <Text style={styles.instructionText}>
-            {classifying ? 'CLASSIFYING…' : `CAPTURE ${currentAnchor} SIDE`}
+            {classifying
+              ? 'CLASSIFYING…'
+              : lowConfidence
+              ? 'NO VEHICLE DETECTED'
+              : `CAPTURE ${currentAnchor} SIDE`}
           </Text>
+          {lowConfidence && !classifying && (
+            <Text style={styles.lowConfText}>
+              Couldn't identify a vehicle. Try again with better framing.
+            </Text>
+          )}
         </View>
       )}
 
@@ -178,6 +225,7 @@ const styles = StyleSheet.create({
   pipLabel:         { color: '#fff', fontWeight: '700', fontSize: 12 },
   instruction:      { position: 'absolute', bottom: 200, left: 24, right: 24, alignItems: 'center', gap: 8 },
   instructionText:  { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 2 },
+  lowConfText:      { color: '#888', fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 24 },
   captureButton:    { position: 'absolute', bottom: 80, alignSelf: 'center', width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   captureInner:     { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
   exitButton:       { position: 'absolute', top: 60, left: 24 },

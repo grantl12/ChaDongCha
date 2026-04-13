@@ -4,6 +4,7 @@
 // EAS env vars used:
 //   MAPBOX_DOWNLOADS_TOKEN  — secret token (sk.), used by Gradle to download Mapbox SDK
 //   MAPBOX_PUBLIC_TOKEN     — public token (pk.), passed through expo extra → runtime
+//   R2_PUBLIC_URL           — public CDN base URL for Cloudflare R2 assets (no trailing slash)
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
@@ -81,5 +82,7 @@ module.exports = {
     },
     // Public Mapbox token — read at runtime via Constants.expoConfig.extra.mapboxPublicToken
     mapboxPublicToken: process.env.MAPBOX_PUBLIC_TOKEN ?? "",
+    // Public base URL for Cloudflare R2 (community photos, 3D assets)
+    r2PublicUrl: process.env.R2_PUBLIC_URL ?? "",
   },
 };

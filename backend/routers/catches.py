@@ -82,11 +82,12 @@ class CatchPayload(BaseModel):
     # ALPR output — confidence boost + dedup signals. Plate NEVER in payload.
     alpr_confidence_boost: Optional[float] = None
     # ALPR's confidence in its own plate character read (0.0–1.0).
-    # Used to decide whether vehicle_hash is reliable enough for hash-based dedup.
     alpr_plate_confidence: Optional[float] = None
     # SHA-256 hash of plate, zeroed on-device immediately after hashing.
-    # Only trusted for dedup when alpr_plate_confidence >= 0.85.
     vehicle_hash: Optional[str] = None
+    # R2 object key for the scan photo — set only when player has opted into
+    # contribute_scans. Stored for community ID and model training purposes.
+    photo_ref: Optional[str] = None
 
 
 @router.post("")
@@ -141,6 +142,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "vehicle_hash": body.vehicle_hash
             if (body.alpr_plate_confidence or 0) >= HASH_DEDUP_MIN_PLATE_CONFIDENCE
             else None,
+        "photo_ref": body.photo_ref,
     }
     result = db.table("catches").insert(catch_row).execute()
     catch_id = result.data[0]["id"]
@@ -211,6 +213,22 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
             spotter_username = _get_username(db, player_id)
             notify_spotter_award(db, player_id, SPOTTER_XP)
             notify_spotted(db, plate_match["owner_id"], spotter_username, body.fuzzy_city)
+
+    # Unknown vehicle queue — create an unknown_catches record so the
+    # community can help identify it. Only when no generation_id resolved
+    # AND a photo was submitted (no photo = nothing to show reviewers).
+    if not body.generation_id and body.photo_ref:
+        try:
+            db.table("unknown_catches").insert({
+                "catch_id":            catch_id,
+                "body_type":           body.body_style,
+                "city":                body.fuzzy_city,
+                "community_photo_ref": body.photo_ref,
+                "photo_shared":        True,
+                "status":              "open",
+            }).execute()
+        except Exception:
+            pass  # Non-fatal — catch is already recorded
 
     # First finder
     first_finder_awarded = None

@@ -134,7 +134,7 @@ export default function ProfileScreen() {
     clearSession, setPlayer, setProfile,
     accessToken, orbitalBoostExpires,
   } = usePlayerStore();
-  const { privacyShieldEnabled, togglePrivacyShield } = useSettingsStore();
+  const { privacyShieldEnabled, togglePrivacyShield, contributeScans, toggleContributeScans } = useSettingsStore();
   const queryClient = useQueryClient();
   const [plateInput, setPlateInput] = useState('');
   const [plateLabel, setPlateLabel] = useState('');
@@ -363,6 +363,25 @@ export default function ProfileScreen() {
             thumbColor="#fff"
           />
         </View>
+        <View style={styles.settingRow}>
+          <View style={styles.settingBody}>
+            <Text style={styles.settingLabel}>Contribute Scans</Text>
+            <Text style={styles.settingDesc}>
+              Anonymized scan photos are uploaded after each catch to help improve the AI model.
+              Photos may be visible to community reviewers.{'\n'}
+              <Text style={styles.settingDisclaimer}>
+                Do not include people, license plates, or private property in frame.
+                See our Terms of Service for details.
+              </Text>
+            </Text>
+          </View>
+          <Switch
+            value={contributeScans}
+            onValueChange={toggleContributeScans}
+            trackColor={{ false: '#222', true: '#4a9eff' }}
+            thumbColor="#fff"
+          />
+        </View>
       </View>
 
       {/* Actions */}
@@ -447,6 +466,7 @@ const styles = StyleSheet.create({
   settingBody:       { flex: 1, gap: 3 },
   settingLabel:      { color: '#fff', fontSize: 14, fontWeight: '600' },
   settingDesc:       { color: '#444', fontSize: 12, lineHeight: 16 },
+  settingDisclaimer: { color: '#333', fontSize: 11, fontStyle: 'italic' },
 
   actions:           { gap: 10, marginTop: 8 },
   actionButton:      { backgroundColor: '#111', borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },

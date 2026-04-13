@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import type { CatchRecord } from '@/stores/catchStore';
+import { Scan360PhotoViewer } from '@/components/Scan360PhotoViewer';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -140,8 +141,11 @@ function CarouselCard({
       {/* Rarity accent bar */}
       <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
-      {/* Vehicle 3D placeholder */}
-      <VehiclePlaceholder rarity={rarity} catchType={item.catchType} />
+      {/* Vehicle visual — real photos for scan360, geometric placeholder otherwise */}
+      {item.catchType === 'scan360' && item.photoPaths && item.photoPaths.length > 0
+        ? <Scan360PhotoViewer photoPaths={item.photoPaths} accent={accent} flex />
+        : <VehiclePlaceholder rarity={rarity} catchType={item.catchType} />
+      }
 
       {/* Info panel */}
       <View style={styles.infoPanel}>

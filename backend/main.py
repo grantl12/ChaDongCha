@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import auth, catches, vehicles, leaderboard, model_update, satellites, territory, players
+from routers import auth, catches, vehicles, leaderboard, model_update, satellites, territory, players, market, uploads, community
 
 app = FastAPI(title="Chadongcha API", version="0.1.0")
 
@@ -22,6 +22,9 @@ app.include_router(model_update.router,  prefix="/model",      tags=["model"])
 app.include_router(satellites.router,    prefix="/satellites", tags=["satellites"])
 app.include_router(territory.router,     prefix="/territory",  tags=["territory"])
 app.include_router(players.router,       prefix="/players",    tags=["players"])
+app.include_router(market.router,        prefix="/market",     tags=["market"])
+app.include_router(uploads.router,       prefix="/uploads",    tags=["uploads"])
+app.include_router(community.router,     prefix="/community",  tags=["community"])
 
 
 @app.get("/health")

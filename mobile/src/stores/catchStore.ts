@@ -4,6 +4,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { uploadPhoto } from '@/utils/uploadPhoto';
 
 export type CatchRecord = {
   id: string;
@@ -22,6 +24,12 @@ export type CatchRecord = {
   synced: boolean;
   xpEarned?: number;             // set after successful backend sync
   firstFinderAwarded?: string | null;
+  /** Local file path of the scan photo. Cleared after upload. */
+  photoPath?: string;
+  /** Ordered [front, passenger, rear, driver] permanent local paths (scan360 only). */
+  photoPaths?: string[];
+  /** R2 object key — set after successful upload. */
+  photoRef?: string;
 };
 
 type ResolveResult  = { generation_id: string | null; rarity_tier: string | null };
@@ -51,10 +59,15 @@ async function resolveGenerationId(
   }
 }
 
+type AddCatchData = Omit<CatchRecord, 'id' | 'caughtAt' | 'synced' | 'generationId' | 'rarity' | 'photoRef'> & {
+  /** Pre-generated ID (e.g. from scan360 so photos are stored under the right dir). */
+  catchId?: string;
+};
+
 type CatchStore = {
   catches: CatchRecord[];
   syncError: string | null;
-  addCatch: (data: Omit<CatchRecord, 'id' | 'caughtAt' | 'synced' | 'generationId' | 'rarity'>) => void;
+  addCatch: (data: AddCatchData) => void;
   syncPending: () => Promise<void>;
   clearSyncError: () => void;
 };
@@ -70,11 +83,13 @@ export const useCatchStore = create<CatchStore>()(
       },
 
       addCatch(data) {
+        const { catchId, ...rest } = data;
         const record: CatchRecord = {
-          ...data,
+          ...rest,
           generationId: null,
           rarity:       null,
-          id:       `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          photoRef:     undefined,
+          id:       catchId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           caughtAt: new Date().toISOString(),
           synced:   false,
         };
@@ -104,6 +119,26 @@ export const useCatchStore = create<CatchStore>()(
               }
             }
 
+            // Upload scan photo to R2 if the user has opted in.
+            // For scan360, use the FRONT photo (photoPaths[0]) as the community image.
+            const uploadCandidate = catch_.photoPath ?? catch_.photoPaths?.[0] ?? null;
+            let photoRef = catch_.photoRef ?? null;
+            if (!photoRef && uploadCandidate) {
+              const { contributeScans } = useSettingsStore.getState();
+              if (contributeScans) {
+                const key = await uploadPhoto(uploadCandidate, catch_.catchType);
+                if (key) {
+                  photoRef = key;
+                  // Store the R2 key locally immediately so retries don't re-upload
+                  set(s => ({
+                    catches: s.catches.map(c =>
+                      c.id === catch_.id ? { ...c, photoRef: key, photoPath: undefined } : c,
+                    ),
+                  }));
+                }
+              }
+            }
+
             const res = await apiClient.post('/catches', {
               generation_id: generationId,
               catch_type:    catch_.catchType,
@@ -113,6 +148,7 @@ export const useCatchStore = create<CatchStore>()(
               fuzzy_city:     catch_.fuzzyCity ?? null,
               fuzzy_district: catch_.fuzzyDistrict ?? null,
               caught_at:      catch_.caughtAt,
+              photo_ref:      photoRef ?? null,
             }) as CatchResponse;
 
             // Apply XP — use server-authoritative level

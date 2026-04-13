@@ -4,6 +4,7 @@ import {
   Pressable, SectionList,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 
@@ -156,7 +157,86 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-type Filter = 'all' | 'mine';
+// ─── Unknown Catches (Community ID) ─────────────────────────────────────────
+
+type UnknownCatch = {
+  id: string;
+  catchId: string;
+  bodyType: string | null;
+  city: string | null;
+  photoRef: string | null;
+  status: string;
+  createdAt: string;
+  catcher: string;
+  catchType: string;
+  suggestionCount: number;
+};
+
+function UnknownItem({ item }: { item: UnknownCatch }) {
+  const age = timeAgo(item.createdAt);
+  return (
+    <Pressable
+      style={styles.unknownItem}
+      onPress={() => router.push({ pathname: '/community-id', params: { unknownId: item.id } })}
+    >
+      <View style={styles.unknownLeft}>
+        <View style={styles.unknownPhotoPlaceholder}>
+          <Text style={styles.unknownPhotoIcon}>📷</Text>
+        </View>
+      </View>
+      <View style={styles.unknownBody}>
+        <Text style={styles.unknownTitle}>Unknown {item.bodyType ?? 'Vehicle'}</Text>
+        <Text style={styles.unknownMeta}>
+          {[item.city, CATCH_TYPE_LABEL[item.catchType]].filter(Boolean).join('  ·  ')}
+        </Text>
+        <Text style={styles.unknownCatcher}>by {item.catcher}  ·  {age}</Text>
+      </View>
+      <View style={styles.unknownRight}>
+        <Text style={styles.unknownVotes}>{item.suggestionCount}</Text>
+        <Text style={styles.unknownVotesLabel}>votes</Text>
+        <Text style={styles.unknownChevron}>›</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function UnknownTab() {
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<UnknownCatch[]>({
+    queryKey: ['community-unknown-list'],
+    queryFn:  () => apiClient.get('/community/unknown?limit=40') as Promise<UnknownCatch[]>,
+    refetchInterval: 60_000,
+  });
+
+  if (isLoading) return <View style={styles.center}><ActivityIndicator color="#e63946" /></View>;
+  if (isError)   return (
+    <View style={styles.center}>
+      <Text style={styles.errorText}>Could not load community queue.</Text>
+      <Pressable onPress={() => refetch()} style={styles.retryButton}>
+        <Text style={styles.retryText}>RETRY</Text>
+      </Pressable>
+    </View>
+  );
+  if (!data || data.length === 0) return (
+    <View style={styles.center}>
+      <Text style={styles.emptyTitle}>ALL IDENTIFIED</Text>
+      <Text style={styles.emptyText}>No unknown catches right now. Check back later.</Text>
+    </View>
+  );
+
+  return (
+    <FlatList
+      data={data}
+      keyExtractor={item => item.id}
+      renderItem={({ item }) => <UnknownItem item={item} />}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      onRefresh={refetch}
+      refreshing={isFetching}
+    />
+  );
+}
+
+type Filter = 'all' | 'mine' | 'unknown';
 
 export default function FeedScreen() {
   const [filter, setFilter] = useState<Filter>('all');
@@ -165,10 +245,12 @@ export default function FeedScreen() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['feed', filter, userId],
     queryFn: () => {
+      if (filter === 'unknown') return Promise.resolve([] as FeedCatch[]); // handled by UnknownTab
       const base = '/catches/recent?limit=50';
       const url  = filter === 'mine' && userId ? `${base}&player_id=${userId}` : base;
       return apiClient.get(url) as Promise<FeedCatch[]>;
     },
+    enabled: filter !== 'unknown',
     refetchInterval: 30_000,
   });
 
@@ -183,29 +265,29 @@ export default function FeedScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>FEED</Text>
-          {isFetching && !isLoading && (
+          {isFetching && !isLoading && filter !== 'unknown' && (
             <ActivityIndicator size="small" color="#333" />
           )}
         </View>
 
         {/* Filter tabs */}
         <View style={styles.tabs}>
-          {(['all', 'mine'] as Filter[]).map(f => (
-            <Pressable
-              key={f}
-              style={[styles.tab, filter === f && styles.tabActive]}
-              onPress={() => setFilter(f)}
-            >
-              <Text style={[styles.tabText, filter === f && styles.tabTextActive]}>
-                {f === 'all' ? 'GLOBAL' : 'MINE'}
-              </Text>
-            </Pressable>
-          ))}
+          <Pressable style={[styles.tab, filter === 'all' && styles.tabActive]} onPress={() => setFilter('all')}>
+            <Text style={[styles.tabText, filter === 'all' && styles.tabTextActive]}>GLOBAL</Text>
+          </Pressable>
+          <Pressable style={[styles.tab, filter === 'mine' && styles.tabActive]} onPress={() => setFilter('mine')}>
+            <Text style={[styles.tabText, filter === 'mine' && styles.tabTextActive]}>MINE</Text>
+          </Pressable>
+          <Pressable style={[styles.tab, filter === 'unknown' && styles.tabActive]} onPress={() => setFilter('unknown')}>
+            <Text style={[styles.tabText, filter === 'unknown' && styles.tabTextActive]}>ID NEEDED</Text>
+          </Pressable>
         </View>
       </View>
 
       {/* Content */}
-      {isLoading ? (
+      {filter === 'unknown' ? (
+        <UnknownTab />
+      ) : isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color="#e63946" />
         </View>
@@ -296,4 +378,18 @@ const styles = StyleSheet.create({
   errorText:          { color: '#555', fontSize: 14 },
   retryButton:        { borderWidth: 1, borderColor: '#333', borderRadius: 6, paddingHorizontal: 20, paddingVertical: 10 },
   retryText:          { color: '#888', fontSize: 12, letterSpacing: 2, fontWeight: '700' },
+
+  // Unknown / Community ID items
+  unknownItem:        { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#111', alignItems: 'center', gap: 14 },
+  unknownLeft:        {},
+  unknownPhotoPlaceholder: { width: 52, height: 52, borderRadius: 8, backgroundColor: '#111', borderWidth: 1, borderColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' },
+  unknownPhotoIcon:   { fontSize: 22 },
+  unknownBody:        { flex: 1, gap: 3 },
+  unknownTitle:       { color: '#fff', fontSize: 16, fontWeight: '700' },
+  unknownMeta:        { color: '#555', fontSize: 12 },
+  unknownCatcher:     { color: '#333', fontSize: 11 },
+  unknownRight:       { alignItems: 'center', gap: 1 },
+  unknownVotes:       { color: '#fff', fontSize: 18, fontWeight: '900' },
+  unknownVotesLabel:  { color: '#333', fontSize: 10, letterSpacing: 1 },
+  unknownChevron:     { color: '#333', fontSize: 20, marginTop: 4 },
 });

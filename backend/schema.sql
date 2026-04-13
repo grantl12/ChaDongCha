@@ -77,6 +77,8 @@ create table if not exists players (
 
 -- push token for satellite pass notifications (added via migration 001 on existing DBs)
 alter table players add column if not exists expo_push_token text;
+-- opt-in training data contribution
+alter table players add column if not exists contribute_scans boolean not null default false;
 
 -- ============================================================
 -- CATCHES
@@ -98,7 +100,9 @@ create table if not exists catches (
   xp_awarded     int not null default 0,
   vehicle_hash   text,
   space_object_id uuid,
-  synced_at      timestamptz
+  synced_at      timestamptz,
+  -- R2 key for the scan photo (populated when player has opted into contribute_scans)
+  photo_ref      text
 );
 
 create index if not exists catches_player_id_idx     on catches(player_id);
@@ -300,6 +304,139 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "first_finders_public_read" on first_finders for select using (true);
 exception when duplicate_object then null; end $$;
+
+-- ============================================================
+-- CREDITS (in-game market currency)
+-- ============================================================
+
+-- Add credits column to players (idempotent)
+alter table players add column if not exists credits bigint not null default 0;
+
+create table if not exists credit_events (
+  id          uuid primary key default uuid_generate_v4(),
+  player_id   uuid not null references players(id) on delete cascade,
+  delta       int  not null,   -- positive = earned, negative = spent
+  reason      text not null,   -- 'catch_reward' | 'market_sale' | 'market_purchase' | 'refund'
+  ref_id      uuid,            -- catch_id or listing_id
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists credit_events_player_id_idx on credit_events(player_id);
+
+-- ============================================================
+-- MARKET
+-- ============================================================
+
+create table if not exists market_listings (
+  id              uuid primary key default uuid_generate_v4(),
+  seller_id       uuid not null references players(id) on delete cascade,
+  catch_id        uuid not null references catches(id) on delete cascade,
+  -- Denormalized for browse queries (avoids joins)
+  generation_id   uuid references generations(id),
+  make            text not null,
+  model           text not null,
+  generation      text not null,
+  body_style      text not null,
+  color           text not null,
+  rarity          text not null check (rarity in ('common','uncommon','rare','epic','legendary')),
+  asking_price    int  not null check (asking_price > 0),
+  status          text not null default 'active'
+                    check (status in ('active','sold','cancelled')),
+  listed_at       timestamptz not null default now(),
+  expires_at      timestamptz not null default now() + interval '7 days',
+  sold_at         timestamptz,
+  sold_to         uuid references players(id)
+);
+
+create index if not exists market_listings_status_idx     on market_listings(status, listed_at desc);
+create index if not exists market_listings_seller_idx     on market_listings(seller_id);
+create index if not exists market_listings_rarity_idx     on market_listings(rarity);
+
+create table if not exists market_bids (
+  id            uuid primary key default uuid_generate_v4(),
+  listing_id    uuid not null references market_listings(id) on delete cascade,
+  bidder_id     uuid not null references players(id) on delete cascade,
+  amount        int  not null check (amount > 0),
+  created_at    timestamptz not null default now(),
+  unique (listing_id, bidder_id)           -- one active bid per player per listing
+);
+
+create index if not exists market_bids_listing_idx on market_bids(listing_id, amount desc);
+create index if not exists market_bids_bidder_idx  on market_bids(bidder_id);
+
+-- RLS for market
+alter table market_listings enable row level security;
+alter table market_bids     enable row level security;
+alter table credit_events   enable row level security;
+
+-- Anyone can browse active listings
+do $$ begin
+  create policy "market_listings_public_read" on market_listings for select using (status = 'active');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "market_listings_seller_read" on market_listings for select using (auth.uid() = seller_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "market_listings_seller_insert" on market_listings for insert with check (auth.uid() = seller_id);
+exception when duplicate_object then null; end $$;
+
+-- Bids — bidder can read/write their own; seller can read bids on their listings
+do $$ begin
+  create policy "market_bids_bidder_write" on market_bids for insert with check (auth.uid() = bidder_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "market_bids_bidder_read" on market_bids for select using (auth.uid() = bidder_id);
+exception when duplicate_object then null; end $$;
+
+-- Credits
+do $$ begin
+  create policy "credit_events_self_read" on credit_events for select using (auth.uid() = player_id);
+exception when duplicate_object then null; end $$;
+
+-- ============================================================
+-- COLLECTION BADGES (server-side record of earned badges)
+-- ============================================================
+-- Note: badge eligibility is computed client-side from catches.
+-- This table is the authoritative record for display and sharing.
+
+create table if not exists player_badges (
+  id          uuid primary key default uuid_generate_v4(),
+  player_id   uuid not null references players(id) on delete cascade,
+  badge_id    text not null,       -- matches Badge.id in badges.ts
+  earned_at   timestamptz not null default now(),
+  unique (player_id, badge_id)
+);
+
+create index if not exists player_badges_player_idx on player_badges(player_id);
+
+alter table player_badges enable row level security;
+
+do $$ begin
+  create policy "player_badges_self_read"   on player_badges for select using (auth.uid() = player_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "player_badges_public_read" on player_badges for select using (true);
+exception when duplicate_object then null; end $$;
+
+-- ============================================================
+-- CREDIT TRANSFER RPCs (called by market accept_bid endpoint)
+-- ============================================================
+
+create or replace function increment_credits(p_player_id uuid, p_amount int)
+returns void language plpgsql security definer as $$
+begin
+  update players set credits = credits + p_amount where id = p_player_id;
+end;
+$$;
+
+create or replace function decrement_credits(p_player_id uuid, p_amount int)
+returns void language plpgsql security definer as $$
+begin
+  update players
+  set credits = greatest(0, credits - p_amount)
+  where id = p_player_id;
+end;
+$$;
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
