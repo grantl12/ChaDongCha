@@ -11,6 +11,21 @@ import * as Notifications from 'expo-notifications';
 import { usePlayerStore } from '@/stores/playerStore';
 import { apiClient } from '@/api/client';
 
+async function saveHomeLocation(): Promise<void> {
+  try {
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    await apiClient.patch('/players/home-location', {
+      home_lat: loc.coords.latitude,
+      home_lon: loc.coords.longitude,
+    });
+  } catch {
+    // Non-fatal — satellite notifications just won't fire until location is set.
+    // Player can update from profile settings later.
+  }
+}
+
 type Step = 'splash' | 'auth' | 'permissions';
 type AuthMode = 'signin' | 'signup';
 
@@ -215,10 +230,14 @@ const PERM_CONFIG = [
     key: 'location' as const,
     icon: '📍',
     title: 'Location',
-    body: 'Required for satellite tracking and Road King territory.',
+    body: 'Required for satellite pass alerts and Road King territory.',
     request: async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      return status === 'granted' ? 'granted' : 'denied';
+      if (status === 'granted') {
+        await saveHomeLocation();
+        return 'granted';
+      }
+      return 'denied';
     },
   },
   {
@@ -244,11 +263,11 @@ const PERM_CONFIG = [
 ];
 
 function PermRow({
-  icon, title, body, status,
+  icon, title, body, status, extraNote,
   onRequest,
 }: {
   icon: string; title: string; body: string;
-  status: PermStatus; onRequest: () => void;
+  status: PermStatus; extraNote?: string; onRequest: () => void;
 }) {
   return (
     <View style={styles.permRow}>
@@ -256,6 +275,9 @@ function PermRow({
       <View style={styles.permBody}>
         <Text style={styles.permTitle}>{title}</Text>
         <Text style={styles.permDesc}>{body}</Text>
+        {extraNote && status === 'granted' && (
+          <Text style={styles.permExtraNote}>{extraNote}</Text>
+        )}
       </View>
       {status === 'pending' ? (
         <Pressable style={styles.permBtn} onPress={onRequest}>
@@ -276,10 +298,18 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
     camera:        'pending',
     notifications: 'pending',
   });
+  const footerAnim = useRef(new Animated.Value(0)).current;
 
   async function handleRequest(key: keyof PermState, requestFn: () => Promise<PermStatus>) {
     const result = await requestFn();
-    setPerms(p => ({ ...p, [key]: result }));
+    setPerms(prev => {
+      const next = { ...prev, [key]: result };
+      const allResolved = Object.values(next).every(s => s !== 'pending');
+      if (allResolved) {
+        Animated.spring(footerAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }).start();
+      }
+      return next;
+    });
   }
 
   const allResolved = Object.values(perms).every(s => s !== 'pending');
@@ -300,13 +330,17 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
             title={p.title}
             body={p.body}
             status={perms[p.key]}
+            extraNote={p.key === 'location' ? '📡 Home location set for satellite alerts' : undefined}
             onRequest={() => handleRequest(p.key, p.request)}
           />
         ))}
       </View>
 
       {allResolved && (
-        <View style={styles.permFooter}>
+        <Animated.View style={[
+          styles.permFooter,
+          { opacity: footerAnim, transform: [{ translateY: footerAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }
+        ]}>
           {!coreGranted && (
             <Text style={styles.permWarning}>
               Location and Camera are required for core gameplay. You can grant them in Settings.
@@ -317,7 +351,7 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
               {coreGranted ? "LET'S GO" : 'CONTINUE ANYWAY'}
             </Text>
           </Pressable>
-        </View>
+        </Animated.View>
       )}
     </View>
   );
@@ -389,6 +423,7 @@ const styles = StyleSheet.create({
   permBody:           { flex: 1, gap: 3 },
   permTitle:          { color: '#fff', fontSize: 15, fontWeight: '700' },
   permDesc:           { color: '#555', fontSize: 13, lineHeight: 18 },
+  permExtraNote:      { color: '#4ade80', fontSize: 11, marginTop: 4, fontWeight: '600' },
   permBtn:            { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8 },
   permBtnText:        { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   permGranted:        { color: '#4ade80', fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },

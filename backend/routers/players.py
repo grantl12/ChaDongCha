@@ -124,6 +124,32 @@ async def register_plate_hash(body: PlateHashRequest, authorization: str = Heade
     return {"id": result.data[0]["id"], "label": body.label}
 
 
+class HomeLocationRequest(BaseModel):
+    home_lat: float
+    home_lon: float
+
+
+@router.patch("/home-location")
+async def set_home_location(body: HomeLocationRequest, authorization: str = Header(...)):
+    """
+    Store the player's home GPS coordinates (set once during onboarding,
+    updatable from profile settings). Used by the satellite worker to filter
+    push notifications to players within NOTIFY_RADIUS_KM of a pass region.
+    """
+    if not (-90 <= body.home_lat <= 90) or not (-180 <= body.home_lon <= 180):
+        raise HTTPException(status_code=400, detail="Invalid coordinates")
+
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+
+    db.table("players").update({
+        "home_lat": body.home_lat,
+        "home_lon": body.home_lon,
+    }).eq("id", player_id).execute()
+
+    return {"ok": True}
+
+
 @router.get("/plate-hashes")
 async def list_plate_hashes(authorization: str = Header(...)):
     """List the calling player's registered plate hashes (hash is masked)."""
