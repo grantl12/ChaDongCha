@@ -122,6 +122,10 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         db, player_id, body.generation_id, SESSION_WINDOW_HOURS
     ) if body.generation_id else 0
 
+    # Personal-first flag must be checked BEFORE the insert — querying after
+    # always returns count >= 1 and the 2× bonus would never fire.
+    is_personal_first = _is_personal_first(db, player_id, body.generation_id)
+
     # Insert catch row
     catch_row = {
         "player_id": player_id,
@@ -170,7 +174,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         catch_type=body.catch_type,
         generation_id=body.generation_id,
         rarity_tier=_get_rarity(db, body.generation_id),
-        is_personal_first=_is_personal_first(db, player_id, body.generation_id),
+        is_personal_first=is_personal_first,
         session_same_gen_count=same_gen_count,
         orbital_boost=orbital_boost,
     )

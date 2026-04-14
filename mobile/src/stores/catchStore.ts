@@ -151,12 +151,13 @@ export const useCatchStore = create<CatchStore>()(
               photo_ref:      photoRef ?? null,
             }) as CatchResponse;
 
-            // Apply XP — use server-authoritative level
-            if (res.xp_earned > 0) {
-              usePlayerStore.getState().applyXp(
-                res.xp_earned,
-                res.level_up ? res.new_level : undefined,
-              );
+            // Sync XP from server-authoritative totals on every catch.
+            // setProfile replaces the stored total, correcting any drift
+            // that built up while catches were queued offline.
+            usePlayerStore.getState().setProfile(res.new_total_xp, res.new_level);
+            if (res.xp_earned > 0 && res.level_up) {
+              // level_up animation trigger still needs the delta path
+              usePlayerStore.getState().applyXp(0, res.new_level);
             }
 
             // Activate orbital boost if a space catch just triggered one
