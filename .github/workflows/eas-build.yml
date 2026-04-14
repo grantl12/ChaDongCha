@@ -30,10 +30,12 @@ jobs:
       - name: Cancel queued/in-progress preview builds
         working-directory: mobile
         run: |
-          PENDING=$(eas build:list --status=new --profile=preview --json --non-interactive 2>/dev/null | jq -r '.[].id' || true)
-          WAITING=$(eas build:list --status=waiting --profile=preview --json --non-interactive 2>/dev/null | jq -r '.[].id' || true)
-          IN_PROGRESS=$(eas build:list --status=in-progress --profile=preview --json --non-interactive 2>/dev/null | jq -r '.[].id' || true)
-          for id in $PENDING $WAITING $IN_PROGRESS; do
+          # Valid EAS statuses: new | in-queue | in-progress | finished | errored | canceled
+          # Previous version used --status=waiting which is not a real status — builds were
+          # slipping through. Single list call + jq filter is more reliable.
+          BUILDS=$(eas build:list --profile=preview --json --non-interactive --limit=20 2>/dev/null \
+            | jq -r '.[] | select(.status | IN("new", "in-queue", "in-progress")) | .id' || true)
+          for id in $BUILDS; do
             echo "Cancelling build $id"
             eas build:cancel $id --non-interactive || true
           done

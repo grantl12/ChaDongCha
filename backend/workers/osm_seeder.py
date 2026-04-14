@@ -53,6 +53,9 @@ SEED_CITIES: list[dict] = [
     {"city": "Singapore",    "country": "SG", "bbox": (1.25, 103.75, 1.45, 103.90)},
     {"city": "Toronto",      "country": "CA", "bbox": (43.60, -79.50, 43.75, -79.30)},
     {"city": "Paris",        "country": "FR", "bbox": (48.82,  2.28, 48.90,  2.41)},
+    # ── Tester cities ────────────────────────────────────────────────────────
+    {"city": "Carrollton",   "country": "US", "bbox": (33.53, -85.12, 33.63, -85.02)},  # 30117 — dev/tester base
+    {"city": "Johnson City", "country": "US", "bbox": (36.27, -82.42, 36.37, -82.29)},  # Android tester
 ]
 
 HIGHWAY_FILTER = '["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"]'
