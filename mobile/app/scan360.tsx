@@ -11,8 +11,10 @@ import { savePhotos } from '@/utils/savePhotos';
 
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
-/** Below this confidence the FRONT gate rejects the frame. */
-const MIN_CONFIDENCE = 0.45;
+/** Below this confidence the FRONT gate rejects the frame.
+ *  Raised from 0.45 — closed-set softmax always forces a winner, so low
+ *  thresholds let non-vehicle textures through at "high confidence". */
+const MIN_CONFIDENCE = 0.65;
 
 /** How long to show the "position vehicle" ready overlay before enabling capture. */
 const READY_DELAY_MS = 2000;

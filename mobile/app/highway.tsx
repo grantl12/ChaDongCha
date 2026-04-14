@@ -19,8 +19,8 @@ const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
 const SPEED_THRESHOLD_MPH  = 15;
 const POLL_INTERVAL_MS      = 500;    // classify at ~2fps
-const CONFIDENCE_AUTO_CATCH = 0.72;
-const CONFIDENCE_PROBABLE   = 0.50;
+const CONFIDENCE_AUTO_CATCH = 0.80;   // raised — model hallucinates below this
+const CONFIDENCE_PROBABLE   = 0.65;   // raised from 0.50
 
 function boostRemainingMin(expires: string | null): number {
   if (!expires) return 0;

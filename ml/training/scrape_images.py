@@ -230,6 +230,19 @@ CLASS_QUERIES: dict[str, list[str]] = {
         "Bugatti Chiron 2017 2018 photo",
         "Chiron supercar real photo",
     ],
+    # ── Background / negative class ────────────────────────────────────────
+    # Critical: without a "not a vehicle" class, softmax always forces a winner.
+    # These images teach the model to output low confidence on non-vehicle inputs.
+    "_Background": [
+        "empty road asphalt no cars",
+        "parking lot pavement empty",
+        "grass field outdoor daylight",
+        "brick wall building exterior",
+        "sidewalk pedestrian street no cars",
+        "indoor room furniture no vehicle",
+        "sky clouds outdoor photo",
+        "trees forest path no vehicles",
+    ],
     # ── Trucks (additional) ─────────────────────────────────────────────────
     "Ram 1500 DT": [
         "Ram 1500 DT 2019 exterior",
