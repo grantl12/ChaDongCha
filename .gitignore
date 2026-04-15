@@ -1,36 +1,8 @@
-# Environment / secrets
-.env
-.env.*
-!.env.example
-
-# Python
+ml/data/
+ml/models/
+ml/ml/
+ml/train_cha.py
 __pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-dist/
-build/
-
-# Node / Expo
-node_modules/
-.expo/
-dist/
-web-build/
-*.tgz
-
-# iOS / Android build artifacts
-mobile/ios/
-mobile/android/
-
-# ML data
-ml/data/images/
-ml/data/images.zip
-
-# Model binaries — too large for git, drop into mobile/assets/ manually before building
-mobile/assets/vehicle_classifier.mlpackage/
-mobile/assets/vehicle_classifier.tflite
-
-# Misc
-.DS_Store
-*.log
+.env
+.vscode/
+*.pyc

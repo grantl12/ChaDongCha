@@ -23,9 +23,9 @@ from io import BytesIO
 from pathlib import Path
 
 try:
-    from ddgs import DDGS
+    from duckduckgo_search import DDGS
 except ImportError:
-    print("Missing dependency: pip install ddgs requests Pillow")
+    print("Missing dependency: pip install duckduckgo_search requests Pillow")
     sys.exit(1)
 
 try:
@@ -42,14 +42,15 @@ log = logging.getLogger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 
-DATA_DIR         = Path(__file__).parent.parent / "data" / "images"
-STATS_FILE       = Path(__file__).parent.parent / "data" / "scrape_stats.json"
+_DEFAULT_DATA_DIR = Path("D:/Users/grant/Documents/ChaDongCha/ml/data/images")
+DATA_DIR          = _DEFAULT_DATA_DIR   # overridden by --data-dir arg
+STATS_FILE        = DATA_DIR.parent / "scrape_stats.json"
 IMAGES_PER_CLASS = 150
 MIN_IMAGE_SIZE   = 224
 MAX_IMAGE_SIZE   = 1024
 
 # Multiple search queries per class — more variety = better model
-CLASS_QUERIES: dict[str, list[str]] = {
+CLASS_QUERIES = {
     "Toyota GR86 ZN8": [
         "Toyota GR86 ZN8 2022 exterior",
         "GR86 ZN8 street photo",
@@ -230,6 +231,18 @@ CLASS_QUERIES: dict[str, list[str]] = {
         "Bugatti Chiron 2017 2018 photo",
         "Chiron supercar real photo",
     ],
+    "2021 Tesla Model S": [
+        "2021 Tesla Model S exterior",
+        "Tesla Model S Plaid 2021 street photo",
+        "2021 Tesla Model S side view",
+        "Tesla Model S 2021 2022 real photo",
+    ],
+    "2025 Honda Odyssey": [
+        "2025 Honda Odyssey exterior",
+        "Honda Odyssey 2025 street photo",
+        "2025 Honda Odyssey side view",
+        "Honda Odyssey 2025 real photo",
+    ],
     # ── Background / negative class ────────────────────────────────────────
     # Critical: without a "not a vehicle" class, softmax always forces a winner.
     # These images teach the model to output low confidence on non-vehicle inputs.
@@ -331,7 +344,7 @@ def save_stats(stats: dict) -> None:
     STATS_FILE.write_text(json.dumps(stats, indent=2))
 
 
-def download_image(url: str) -> tuple[bytes, Image.Image] | None:
+def download_image(url: str):
     try:
         r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
         r.raise_for_status()
@@ -349,7 +362,7 @@ def download_image(url: str) -> tuple[bytes, Image.Image] | None:
         return None
 
 
-def scrape_class(ddgs: DDGS, gen_class: str, target: int, seen_hashes: set[str]) -> int:
+def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
     queries  = CLASS_QUERIES.get(gen_class, [f"{gen_class} car exterior photo"])
     dest_dir = class_to_dir(gen_class)
     existing = len(list(dest_dir.glob("*.jpg"))) if dest_dir.exists() else 0
@@ -410,7 +423,7 @@ def scrape_class(ddgs: DDGS, gen_class: str, target: int, seen_hashes: set[str])
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main(target_class: str | None, per_class: int) -> None:
+def main(target_class, per_class: int) -> None:
     stats       = load_stats()
     seen_hashes = set(stats.get("seen_hashes", []))
     counts      = stats.get("counts", {})
@@ -437,6 +450,12 @@ if __name__ == "__main__":
     parser.add_argument("--cls",       dest="target_class", help="Scrape one class only")
     parser.add_argument("--per-class", type=int, default=IMAGES_PER_CLASS,
                         help=f"Images per class (default {IMAGES_PER_CLASS})")
+    parser.add_argument("--data-dir",  dest="data_dir", default=None,
+                        help="Override image output directory (default: ml/data/images)")
     args = parser.parse_args()
+
+    if args.data_dir:
+        DATA_DIR   = Path(args.data_dir)
+        STATS_FILE = DATA_DIR.parent / "scrape_stats.json"
 
     main(args.target_class, args.per_class)
